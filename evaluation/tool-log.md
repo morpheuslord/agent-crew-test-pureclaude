@@ -142,3 +142,20 @@ security-related operation (CLI command or own review). Format as defined in the
 - Changes: infra/** (commit 5a8aaaf)
 - Notes: `terraform init -backend=false` downloaded hashicorp/aws 6.69.1 and hashicorp/random 3.9.1; validate passed on the first run. To break a module dependency cycle (database -> API SG -> IAM -> database secret), all cross-module security group rules live in `infra/envs/dev/security_rules.tf`.
 
+### T-010 | 2026-10-18T07:46:03Z | phase 7
+- Source: Self
+- Why: security review of the container, Compose, CI and smoke-test files written in phase 7
+- Input: `api/Dockerfile`, `ui/Dockerfile`, `docker-compose.yml`, `docker-compose.test.yml`, `.env.example`, `Makefile`, `.github/workflows/ci.yml`, `scripts/smoke.sh`; `docker compose --env-file .env.example config` output (published ports: only `ui` on `127.0.0.1:3000`; network `data` internal)
+- Output: own review notes:
+  1. Images: multi-stage, base images pinned by tag and digest (python 3.13.16-slim-bookworm, node 24.22.0-bookworm-slim, uv 0.11.21), final stages contain no compilers or package managers beyond the base, run as non-root (uid 10001 / node), dependencies from lockfiles only (`uv sync --frozen`, `npm ci`), `.dockerignore` keeps `.env` files, tests and local caches out of the build context.
+  2. Compose: only the UI is published and only on 127.0.0.1; API, PostgreSQL and Redis have no published ports; PostgreSQL/Redis are on an `internal: true` network with no outside route; Redis requires a password; required secrets use `${VAR:?}` so the stack refuses to start without them; app containers are read-only with all capabilities dropped and no-new-privileges (Redis keeps SETUID/SETGID for its entrypoint).
+  3. Secrets: `.env` is git-ignored; `.env.example` has placeholders only; CI uses no repository secrets (its PostgreSQL password is a throwaway test value).
+  4. CI: `permissions: contents: read`, `persist-credentials: false`, every action pinned by commit SHA, no `pull_request_target`, no untrusted input interpolated into `run:` scripts.
+  5. Smoke script: generates random credentials per run, keeps cookies in a private temp dir removed on exit, talks only to the UI.
+  6. Residual (dev only): traffic between Compose containers is unencrypted (PostgreSQL, Redis, UI -> API) and secrets sit in a local `.env` file. Recorded as F-035, accepted for local development.
+- Interpretation: own analysis. Docker is not usable in this session, so the images were not built locally; the CI job `images` builds both. The packaging the API image relies on was checked by building the wheel and running `taskboard-api migrate` from a clean virtualenv outside the source tree.
+- Findings: F-035; dispositions of F-015 and F-021 updated
+- Action: applied; F-035 accepted risk
+- Changes: Dockerfiles a2ade1a, Compose/Makefile/.env.example 5c8ed75, CI ce303c2
+- Notes: none
+
