@@ -122,3 +122,23 @@ security-related operation (CLI command or own review). Format as defined in the
 - Changes: ui/src/views/MarkdownRenderer.ts (commit d43ecc2)
 - Notes: a local end-to-end run (API and UI as real processes on native PostgreSQL/Redis, driven by scripts/smoke.sh through the UI only) passed. The first UI start failed config validation because the shell already exported `API_TIMEOUT_MS` (set by another tool); the variable was renamed to `API_REQUEST_TIMEOUT_MS`. Not security relevant, so no finding.
 
+### T-009 | 2026-10-18T07:37:34Z | phase 6
+- Source: Self
+- Why: security review of the Terraform modules and dev environment written in phase 6
+- Input: `infra/modules/**`, `infra/envs/dev/**`; `terraform validate` result (`Success! The configuration is valid.`)
+- Output: own review notes:
+  1. Exposure: only the public ALB is in public subnets; UI, API, internal API ALB, RDS and ElastiCache are in private subnets. Security group chain client -> ALB:443/80 -> UI:3000 -> API LB:80 -> API:8000 -> RDS:5432 / cache:6379, each rule referencing the previous group; Terraform removes the default allow-all egress; the default VPC security group has no rules. ALB ingress limited to `allowed_client_cidrs`.
+  2. Transport: ALB HTTPS with a TLS 1.3 policy and HTTP->HTTPS redirect, drop_invalid_header_fields, desync mitigation "strictest"; RDS `rds.force_ssl=1`; ElastiCache transit encryption "required" with AUTH.
+  3. At rest: one customer-managed KMS key with rotation for RDS storage, Performance Insights, the RDS-managed master secret, ElastiCache, S3 attachments (bucket key), ECR, EBS, CloudWatch log groups and SSM SecureStrings. Key policy limits the Logs service to this environment's log groups.
+  4. S3: public access blocked, BucketOwnerEnforced, versioning, TLS-only policy, uploads with another KMS key denied, access logging.
+  5. Instances: IMDSv2 required, no SSH keys or SSH ingress (Session Manager only), encrypted gp3 volumes, detailed monitoring. Containers run read-only with all capabilities dropped, no-new-privileges, pid and memory limits.
+  6. Secrets: user_data holds only parameter names and ARNs; values are fetched at boot with the instance role into a 0600 env file. The service token and UI secret are ephemeral random values written with `value_wo`, so they are not in state; the database password is generated and stored by RDS (`manage_master_user_password`).
+  7. IAM: per-service roles; ECR pull on the own repository, log writes on the own log group, SSM read on listed parameters, Secrets Manager read on the two API secrets, S3 object access under `attachments/` of one bucket.
+  8. Images: ECR immutable tags, scan on push, lifecycle policy; deploys reference a git SHA tag (`latest` rejected by validation).
+  9. Accepted/residual: F-027 internal hops are plain HTTP inside private subnets; F-028 the cache AUTH token is in Terraform state; F-029 AmazonSSMManagedInstanceCore allows ssm:GetParameter on all parameters (the API role can therefore read the UI secret); F-030 UI and API need 0.0.0.0/0:443 egress (AWS endpoints via NAT; webhooks); F-031 ALB and S3 access-log buckets use SSE-S3 because log delivery does not support SSE-KMS; F-032 API instances use IMDS hop limit 2 so the container can use the instance role; F-033 the API connects with sslmode=require, not verify-full; F-034 no AWS WAF in front of the ALB.
+- Interpretation: own analysis; nothing was planned or applied against AWS.
+- Findings: F-027 to F-034; dispositions of F-013, F-015 (partial) and F-017 updated
+- Action: applied (design as described); F-027 to F-034 accepted risk or mitigated as listed
+- Changes: infra/** (commit 5a8aaaf)
+- Notes: `terraform init -backend=false` downloaded hashicorp/aws 6.69.1 and hashicorp/random 3.9.1; validate passed on the first run. To break a module dependency cycle (database -> API SG -> IAM -> database secret), all cross-module security group rules live in `infra/envs/dev/security_rules.tf`.
+
