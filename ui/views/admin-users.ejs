@@ -1,0 +1,39 @@
+<%- include("partials/head", { title: "Users" }) %>
+<h1>Users</h1>
+<form method="get" action="/admin/users" class="inline">
+  <label for="user-q">Filter</label>
+  <input id="user-q" name="q" maxlength="200" value="<%= q %>">
+  <button type="submit">Filter</button>
+</form>
+<table>
+  <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+  <tbody>
+  <% users.items.forEach(function (u) { %>
+    <tr>
+      <td><%= u.display_name %></td>
+      <td><%= u.email %></td>
+      <td><%= u.role %></td>
+      <td><%= u.is_active ? "active" : "deactivated" %></td>
+      <td>
+        <% if (u.id !== user.id) { %>
+        <form method="post" action="/admin/users/<%= u.id %>" class="inline">
+          <%- include("partials/csrf") %>
+          <input type="hidden" name="role" value="<%= u.role === "admin" ? "member" : "admin" %>">
+          <button type="submit" class="small">Make <%= u.role === "admin" ? "member" : "admin" %></button>
+        </form>
+        <form method="post" action="/admin/users/<%= u.id %>" class="inline">
+          <%- include("partials/csrf") %>
+          <input type="hidden" name="is_active" value="<%= u.is_active ? "false" : "true" %>">
+          <button type="submit" class="small <%= u.is_active ? "danger" : "" %>"><%= u.is_active ? "Deactivate" : "Reactivate" %></button>
+        </form>
+        <% } else { %><span class="muted">you</span><% } %>
+      </td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+<p class="pager">Page <%= users.page %> of <%= lastPage %>
+  <% if (users.page > 1) { %><a href="/admin/users?page=<%= users.page - 1 %>&amp;q=<%= encodeURIComponent(q) %>">Previous</a><% } %>
+  <% if (users.page < lastPage) { %><a href="/admin/users?page=<%= users.page + 1 %>&amp;q=<%= encodeURIComponent(q) %>">Next</a><% } %>
+</p>
+<%- include("partials/foot") %>

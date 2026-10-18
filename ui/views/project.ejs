@@ -1,0 +1,52 @@
+<%- include("partials/head", { title: project.name }) %>
+<p class="crumbs"><a href="/teams/<%= project.team_id %>"><%= project.team_name %></a> /</p>
+<h1><%= project.name %><% if (project.archived) { %> <span class="badge">archived, read-only</span><% } %></h1>
+<p>
+  <a href="/projects/<%= project.id %>/export.csv">Export CSV</a> ·
+  <a href="/projects/<%= project.id %>/activity">Activity</a>
+</p>
+<div class="board">
+  <% columns.forEach(function (column) { %>
+  <section class="column" aria-label="<%= column.label %>">
+    <h2><%= column.label %> <span class="muted">(<%= column.total %>)</span></h2>
+    <% column.tasks.forEach(function (task) { %>
+    <article class="task-card">
+      <a href="/tasks/<%= task.id %>"><%= task.title %></a>
+      <p class="muted"><%= task.priority %><% if (task.assignee) { %> · <%= task.assignee %><% } %><% if (task.dueDate) { %> · due <%= task.dueDate %><% } %></p>
+      <% if (task.labels.length) { %><p><% task.labels.forEach(function (label) { %><span class="label"><%= label %></span> <% }) %></p><% } %>
+    </article>
+    <% }) %>
+  </section>
+  <% }) %>
+</div>
+<% if (!project.archived) { %>
+<section class="card">
+  <h2>New task</h2>
+  <form method="post" action="/projects/<%= project.id %>/tasks">
+    <%- include("partials/csrf") %>
+    <%- include("partials/task-fields", { task: null }) %>
+    <button type="submit">Create task</button>
+  </form>
+</section>
+<% } %>
+<% if (project.can_manage && !project.archived) { %>
+<section class="card">
+  <h2>Project settings</h2>
+  <form method="post" action="/projects/<%= project.id %>/settings">
+    <%- include("partials/csrf") %>
+    <label for="settings-name">Name</label>
+    <input id="settings-name" name="name" required maxlength="100" value="<%= project.name %>">
+    <label for="settings-webhook">Webhook URL (https; empty to remove)</label>
+    <input id="settings-webhook" name="webhook_url" type="url" maxlength="2048" value="<%= project.webhook_url || "" %>">
+    <% if (project.webhook_secret) { %>
+    <p class="muted">Signing secret (HMAC-SHA256 in <code>X-Taskboard-Signature</code>): <code><%= project.webhook_secret %></code></p>
+    <% } %>
+    <button type="submit">Save settings</button>
+  </form>
+  <form method="post" action="/projects/<%= project.id %>/archive">
+    <%- include("partials/csrf") %>
+    <button type="submit" class="danger">Archive project</button>
+  </form>
+</section>
+<% } %>
+<%- include("partials/foot") %>

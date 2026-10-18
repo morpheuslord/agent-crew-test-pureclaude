@@ -1,0 +1,18 @@
+<%- include("partials/head", { title: "Profile" }) %>
+<h1>Profile</h1>
+<section class="card narrow">
+  <p><strong><%= user.display_name %></strong></p>
+  <p><%= user.email %> · <%= user.role %></p>
+</section>
+<section class="card narrow">
+  <h2>Change password</h2>
+  <form method="post" action="/profile/password" novalidate>
+    <%- include("partials/csrf") %>
+    <%- include("partials/form-error") %>
+    <%- include("partials/field", { name: "current_password", label: "Current password", type: "password", value: "", required: true, autocomplete: "current-password", maxlength: 128 }) %>
+    <%- include("partials/field", { name: "new_password", label: "New password (at least 10 characters)", type: "password", value: "", required: true, autocomplete: "new-password", maxlength: 128 }) %>
+    <%- include("partials/field", { name: "new_password_confirm", label: "Repeat new password", type: "password", value: "", required: true, autocomplete: "new-password", maxlength: 128 }) %>
+    <button type="submit">Change password</button>
+  </form>
+</section>
+<%- include("partials/foot") %>

@@ -1,0 +1,54 @@
+<%- include("partials/head", { title: team.name }) %>
+<h1><%= team.name %></h1>
+<div class="grid">
+  <section class="card">
+    <h2>Members</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
+      <tbody>
+      <% team.members.forEach(function (member) { %>
+        <tr>
+          <td><%= member.display_name %><% if (member.is_owner) { %> <span class="badge">owner</span><% } %></td>
+          <td><%= member.email %></td>
+          <td>
+            <% if (team.can_manage && !member.is_owner) { %>
+            <form method="post" action="/teams/<%= team.id %>/members/<%= member.user_id %>/remove" class="inline">
+              <%- include("partials/csrf") %>
+              <button type="submit" class="danger small">Remove</button>
+            </form>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+    <% if (team.can_manage) { %>
+    <form method="post" action="/teams/<%= team.id %>/members">
+      <%- include("partials/csrf") %>
+      <label for="member-email">Add member by email</label>
+      <input id="member-email" name="email" type="email" required maxlength="254">
+      <button type="submit">Add member</button>
+    </form>
+    <% } %>
+  </section>
+  <section class="card">
+    <h2>Projects</h2>
+    <% if (projects.length === 0) { %><p class="muted">No projects yet.</p><% } %>
+    <ul>
+      <% projects.forEach(function (project) { %>
+      <li><a href="/projects/<%= project.id %>"><%= project.name %></a><% if (project.archived) { %> <span class="badge">archived</span><% } %></li>
+      <% }) %>
+    </ul>
+    <% if (team.can_manage) { %>
+    <form method="post" action="/teams/<%= team.id %>/projects">
+      <%- include("partials/csrf") %>
+      <label for="project-name">New project</label>
+      <input id="project-name" name="name" required maxlength="100">
+      <label for="project-webhook">Webhook URL (optional, https)</label>
+      <input id="project-webhook" name="webhook_url" type="url" maxlength="2048" placeholder="https://example.com/hooks/taskboard">
+      <button type="submit">Create project</button>
+    </form>
+    <% } %>
+  </section>
+</div>
+<%- include("partials/foot") %>

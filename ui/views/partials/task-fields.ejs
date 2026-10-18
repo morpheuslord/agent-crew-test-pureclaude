@@ -1,0 +1,39 @@
+<%# Shared task form fields. Expects: task (optional), statusOptions, priorityOptions, memberOptions. %>
+<% const t = locals.task || {}; %>
+<label for="title">Title</label>
+<input id="title" name="title" required maxlength="200" value="<%= t.title || "" %>">
+<label for="description">Description (Markdown)</label>
+<textarea id="description" name="description" rows="5" maxlength="20000"><%= t.description || "" %></textarea>
+<div class="row">
+  <div>
+    <label for="status">Status</label>
+    <select id="status" name="status">
+      <% statusOptions.forEach(function (o) { %>
+      <option value="<%= o.value %>" <%= (t.status || "todo") === o.value ? "selected" : "" %>><%= o.label %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div>
+    <label for="priority">Priority</label>
+    <select id="priority" name="priority">
+      <% priorityOptions.forEach(function (o) { %>
+      <option value="<%= o.value %>" <%= (t.priority || "medium") === o.value ? "selected" : "" %>><%= o.label %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div>
+    <label for="assignee_id">Assignee</label>
+    <select id="assignee_id" name="assignee_id">
+      <option value="">Nobody</option>
+      <% memberOptions.forEach(function (o) { %>
+      <option value="<%= o.value %>" <%= t.assignee_id === o.value ? "selected" : "" %>><%= o.label %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div>
+    <label for="due_date">Due date</label>
+    <input id="due_date" name="due_date" type="date" value="<%= t.due_date || "" %>">
+  </div>
+</div>
+<label for="labels">Labels (comma separated)</label>
+<input id="labels" name="labels" maxlength="1000" value="<%= (t.labels || []).join(", ") %>">

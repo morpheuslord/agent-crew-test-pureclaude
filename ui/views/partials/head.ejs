@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · Taskboard</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/">Taskboard</a>
+  <% if (locals.user) { %>
+  <nav aria-label="Main">
+    <a href="/">Dashboard</a>
+    <a href="/search">Search</a>
+    <a href="/profile">Profile</a>
+    <% if (user.role === "admin") { %>
+    <a href="/admin/users">Users</a>
+    <a href="/admin/activity">Activity</a>
+    <% } %>
+    <form method="post" action="/logout" class="inline">
+      <%- include("csrf") %>
+      <button type="submit" class="link">Log out (<%= user.display_name %>)</button>
+    </form>
+  </nav>
+  <% } %>
+</header>
+<main>
+<% if (locals.flash) { %>
+  <div class="flash flash-<%= flash.type === "error" ? "error" : "success" %>" role="status"><%= flash.message %></div>
+<% } %>

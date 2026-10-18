@@ -1,0 +1,18 @@
+<%- include("partials/head", { title: heading }) %>
+<p class="crumbs"><a href="<%= backHref %>">Back</a></p>
+<h1><%= heading %></h1>
+<% if (feed.items.length === 0) { %><p class="muted">No activity yet.</p><% } %>
+<ul class="feed">
+  <% feed.items.forEach(function (item) { %>
+  <li>
+    <span class="muted"><%= item.when %></span>
+    <strong><%= item.actor_name || "Someone" %></strong> <%= item.summary %>
+    <% if (item.task_id && item.event_type !== "task.deleted") { %><a href="/tasks/<%= item.task_id %>">open task</a><% } %>
+  </li>
+  <% }) %>
+</ul>
+<p class="pager">Page <%= feed.page %> of <%= feed.lastPage %>
+  <% if (feed.page > 1) { %><a href="<%= baseHref %>?page=<%= feed.page - 1 %>">Newer</a><% } %>
+  <% if (feed.page < feed.lastPage) { %><a href="<%= baseHref %>?page=<%= feed.page + 1 %>">Older</a><% } %>
+</p>
+<%- include("partials/foot") %>

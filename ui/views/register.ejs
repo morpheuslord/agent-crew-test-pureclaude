@@ -1,0 +1,13 @@
+<%- include("partials/head", { title: "Register" }) %>
+<h1>Create an account</h1>
+<form method="post" action="/register" class="card narrow" novalidate>
+  <%- include("partials/csrf") %>
+  <%- include("partials/form-error") %>
+  <%- include("partials/field", { name: "email", label: "Email", type: "email", value: values.email, required: true, autocomplete: "email", maxlength: 254 }) %>
+  <%- include("partials/field", { name: "display_name", label: "Display name", type: "text", value: values.display_name, required: true, autocomplete: "name", maxlength: 100 }) %>
+  <%- include("partials/field", { name: "password", label: "Password (at least 10 characters)", type: "password", value: "", required: true, autocomplete: "new-password", maxlength: 128 }) %>
+  <%- include("partials/field", { name: "password_confirm", label: "Repeat password", type: "password", value: "", required: true, autocomplete: "new-password", maxlength: 128 }) %>
+  <button type="submit">Register</button>
+</form>
+<p>Already registered? <a href="/login">Log in</a></p>
+<%- include("partials/foot") %>

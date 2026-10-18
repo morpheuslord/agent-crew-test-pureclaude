@@ -1,0 +1,6 @@
+<%# Renders a labelled input. Expects: name, label, type, value (optional), errors, extra attributes in attrs. %>
+<label for="<%= name %>"><%= label %></label>
+<input id="<%= name %>" name="<%= name %>" type="<%= type %>" value="<%= locals.value || "" %>"
+  <% if (locals.required) { %>required<% } %> <% if (locals.autocomplete) { %>autocomplete="<%= autocomplete %>"<% } %>
+  <% if (locals.maxlength) { %>maxlength="<%= maxlength %>"<% } %>>
+<% if (errors && errors[name]) { %><p class="field-error"><%= errors[name] %></p><% } %>

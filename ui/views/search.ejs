@@ -1,0 +1,48 @@
+<%- include("partials/head", { title: "Search" }) %>
+<h1>Search tasks</h1>
+<form method="get" action="/search" class="card">
+  <div class="row">
+    <div><label for="q">Text</label><input id="q" name="q" maxlength="200" value="<%= query.q || "" %>"></div>
+    <div><label for="s-status">Status</label>
+      <select id="s-status" name="status"><option value="">Any</option>
+        <% statusOptions.forEach(function (o) { %><option value="<%= o.value %>" <%= query.status === o.value ? "selected" : "" %>><%= o.label %></option><% }) %>
+      </select></div>
+    <div><label for="label">Label</label><input id="label" name="label" maxlength="40" value="<%= query.label || "" %>"></div>
+    <div><label for="assignee">Assignee id</label><input id="assignee" name="assignee_id" maxlength="36" value="<%= query.assignee_id || "" %>"></div>
+    <div><label for="due_before">Due before</label><input id="due_before" name="due_before" type="date" value="<%= query.due_before || "" %>"></div>
+    <div><label for="sort">Sort by</label>
+      <select id="sort" name="sort">
+        <% sortOptions.forEach(function (o) { %><option value="<%= o.value %>" <%= query.sort === o.value ? "selected" : "" %>><%= o.label %></option><% }) %>
+      </select></div>
+    <div><label for="order">Order</label>
+      <select id="order" name="order">
+        <option value="desc" <%= query.order !== "asc" ? "selected" : "" %>>Descending</option>
+        <option value="asc" <%= query.order === "asc" ? "selected" : "" %>>Ascending</option>
+      </select></div>
+  </div>
+  <button type="submit">Search</button>
+</form>
+<% if (results) { %>
+<p><%= total %> result<%= total === 1 ? "" : "s" %></p>
+<table>
+  <thead><tr><th>Task</th><th>Project</th><th>Status</th><th>Priority</th><th>Assignee</th><th>Due</th></tr></thead>
+  <tbody>
+  <% results.forEach(function (task) { %>
+    <tr>
+      <td><a href="/tasks/<%= task.id %>"><%= task.title %></a></td>
+      <td><a href="/projects/<%= task.project_id %>"><%= task.project_name %></a></td>
+      <td><%= task.statusLabel %></td>
+      <td><%= task.priorityLabel %></td>
+      <td><%= task.assignee_name || "" %></td>
+      <td><%= task.due_date || "" %></td>
+    </tr>
+  <% }) %>
+  </tbody>
+</table>
+<p class="pager">
+  <% if (previousHref) { %><a href="<%= previousHref %>">Previous</a><% } %>
+  Page <%= page %> of <%= lastPage %>
+  <% if (nextHref) { %><a href="<%= nextHref %>">Next</a><% } %>
+</p>
+<% } %>
+<%- include("partials/foot") %>

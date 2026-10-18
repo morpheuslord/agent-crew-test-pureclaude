@@ -1,0 +1,11 @@
+<%- include("partials/head", { title: "Log in" }) %>
+<h1>Log in</h1>
+<form method="post" action="/login" class="card narrow" novalidate>
+  <%- include("partials/csrf") %>
+  <%- include("partials/form-error") %>
+  <%- include("partials/field", { name: "email", label: "Email", type: "email", value: values.email, required: true, autocomplete: "username", maxlength: 254 }) %>
+  <%- include("partials/field", { name: "password", label: "Password", type: "password", value: "", required: true, autocomplete: "current-password", maxlength: 128 }) %>
+  <button type="submit">Log in</button>
+</form>
+<p><a href="/register">Create an account</a> · <a href="/forgot-password">Forgot your password?</a></p>
+<%- include("partials/foot") %>

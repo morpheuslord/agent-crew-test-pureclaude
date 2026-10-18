@@ -1,0 +1,196 @@
+:root {
+  --bg: #f6f7f9;
+  --fg: #1d2330;
+  --muted: #5c6577;
+  --card: #ffffff;
+  --border: #d9dde5;
+  --accent: #2856d8;
+  --danger: #b42318;
+  --ok: #1e7b45;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--fg);
+}
+.topbar a,
+.topbar .link {
+  color: #fff;
+  text-decoration: none;
+  margin-right: 1rem;
+}
+.brand {
+  font-weight: 700;
+}
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.narrow {
+  max-width: 28rem;
+}
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+.board {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  margin-bottom: 1rem;
+}
+.column {
+  background: #eceff4;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+.task-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+label {
+  display: block;
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+}
+input,
+select,
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+}
+input[type="file"] {
+  border: none;
+}
+button {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border: 0;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+button.danger {
+  background: var(--danger);
+}
+button.small {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.85rem;
+}
+button.link {
+  background: none;
+  padding: 0;
+  margin: 0;
+}
+form.inline {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0;
+}
+form.inline input,
+form.inline select {
+  width: auto;
+}
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.badge,
+.label {
+  display: inline-block;
+  padding: 0 0.4rem;
+  border-radius: 4px;
+  background: #e3e8f4;
+  font-size: 0.8rem;
+}
+.flash {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+.flash-success {
+  background: #e3f4ea;
+  color: var(--ok);
+}
+.flash-error,
+.form-error {
+  background: #fde8e6;
+  color: var(--danger);
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+.field-error {
+  color: var(--danger);
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+}
+th,
+td {
+  text-align: left;
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.markdown pre {
+  overflow-x: auto;
+  background: #f0f2f6;
+  padding: 0.5rem;
+}
+.comment {
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+.feed li {
+  margin-bottom: 0.4rem;
+}
+.crumbs {
+  margin-bottom: 0;
+}

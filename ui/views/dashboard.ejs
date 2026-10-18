@@ -1,0 +1,41 @@
+<%- include("partials/head", { title: "Dashboard" }) %>
+<h1>Dashboard</h1>
+<div class="grid">
+  <section class="card">
+    <h2>My teams</h2>
+    <% if (teams.length === 0) { %><p class="muted">You are not in any team yet.</p><% } %>
+    <ul>
+      <% teams.forEach(function (team) { %>
+      <li><a href="/teams/<%= team.id %>"><%= team.name %></a></li>
+      <% }) %>
+    </ul>
+    <form method="post" action="/teams">
+      <%- include("partials/csrf") %>
+      <label for="team-name">New team</label>
+      <input id="team-name" name="name" required maxlength="100" placeholder="Team name">
+      <button type="submit">Create team</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>My projects</h2>
+    <% if (projects.length === 0) { %><p class="muted">No projects yet.</p><% } %>
+    <ul>
+      <% projects.forEach(function (project) { %>
+      <li><a href="/projects/<%= project.id %>"><%= project.name %></a><% if (project.archived) { %> <span class="badge">archived</span><% } %></li>
+      <% }) %>
+    </ul>
+  </section>
+  <section class="card">
+    <h2>Assigned to me</h2>
+    <% if (assigned.length === 0) { %><p class="muted">Nothing assigned to you.</p><% } %>
+    <ul>
+      <% assigned.forEach(function (task) { %>
+      <li>
+        <a href="/tasks/<%= task.id %>"><%= task.title %></a>
+        <span class="muted"><%= task.project_name %><% if (task.due_date) { %> · due <%= task.due_date %><% } %></span>
+      </li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+<%- include("partials/foot") %>

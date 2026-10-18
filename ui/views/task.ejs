@@ -1,0 +1,89 @@
+<%- include("partials/head", { title: task.title }) %>
+<p class="crumbs"><a href="/teams/<%= project.team_id %>"><%= project.team_name %></a> / <a href="/projects/<%= project.id %>"><%= project.name %></a> /</p>
+<h1><%= task.title %></h1>
+<p class="muted">
+  <%= statusLabel %> · <%= priorityLabel %> priority
+  <% if (task.assignee_name) { %> · assigned to <%= task.assignee_name %><% } %>
+  <% if (task.due_date) { %> · due <%= task.due_date %><% } %>
+  <% if (labelsText) { %> · labels: <%= labelsText %><% } %>
+</p>
+<section class="card markdown"><%- descriptionHtml %></section>
+
+<% if (!readOnly) { %>
+<section class="card">
+  <h2>Status</h2>
+  <form method="post" action="/tasks/<%= task.id %>/status" class="inline">
+    <%- include("partials/csrf") %>
+    <select name="status" aria-label="Status">
+      <% statusOptions.forEach(function (o) { %><option value="<%= o.value %>" <%= task.status === o.value ? "selected" : "" %>><%= o.label %></option><% }) %>
+    </select>
+    <button type="submit">Update status</button>
+  </form>
+</section>
+<details class="card">
+  <summary>Edit task</summary>
+  <form method="post" action="/tasks/<%= task.id %>">
+    <%- include("partials/csrf") %>
+    <%- include("partials/task-fields", { task: task }) %>
+    <button type="submit">Save task</button>
+  </form>
+  <form method="post" action="/tasks/<%= task.id %>/delete">
+    <%- include("partials/csrf") %>
+    <button type="submit" class="danger">Delete task</button>
+  </form>
+</details>
+<% } %>
+
+<section class="card">
+  <h2>Comments</h2>
+  <% if (comments.length === 0) { %><p class="muted">No comments yet.</p><% } %>
+  <% comments.forEach(function (comment) { %>
+  <article class="comment">
+    <p class="muted"><strong><%= comment.author_name %></strong> · <%= comment.createdLabel %><% if (comment.edited) { %> · edited<% } %></p>
+    <div class="markdown"><%- comment.bodyHtml %></div>
+    <% if (comment.canEdit) { %>
+    <details>
+      <summary>Edit</summary>
+      <form method="post" action="/comments/<%= comment.id %>">
+        <%- include("partials/csrf") %>
+        <input type="hidden" name="task_id" value="<%= task.id %>">
+        <textarea name="body" rows="3" maxlength="10000" aria-label="Comment"><%= comment.body %></textarea>
+        <button type="submit">Save comment</button>
+      </form>
+      <form method="post" action="/comments/<%= comment.id %>/delete">
+        <%- include("partials/csrf") %>
+        <input type="hidden" name="task_id" value="<%= task.id %>">
+        <button type="submit" class="danger small">Delete comment</button>
+      </form>
+    </details>
+    <% } %>
+  </article>
+  <% }) %>
+  <% if (!readOnly) { %>
+  <form method="post" action="/tasks/<%= task.id %>/comments">
+    <%- include("partials/csrf") %>
+    <label for="comment-body">Add a comment (Markdown)</label>
+    <textarea id="comment-body" name="body" rows="3" required maxlength="10000"></textarea>
+    <button type="submit">Comment</button>
+  </form>
+  <% } %>
+</section>
+
+<section class="card">
+  <h2>Attachments</h2>
+  <% if (attachments.length === 0) { %><p class="muted">No attachments.</p><% } %>
+  <ul>
+    <% attachments.forEach(function (a) { %>
+    <li><a href="/attachments/<%= a.id %>/download"><%= a.filename %></a> <span class="muted"><%= a.sizeLabel %> · <%= a.uploader_name %> · <%= a.createdLabel %></span></li>
+    <% }) %>
+  </ul>
+  <% if (!readOnly) { %>
+  <form method="post" action="/tasks/<%= task.id %>/attachments" enctype="multipart/form-data">
+    <%- include("partials/csrf") %>
+    <label for="file">Upload a file (up to 10 MB)</label>
+    <input id="file" name="file" type="file" required>
+    <button type="submit">Upload</button>
+  </form>
+  <% } %>
+</section>
+<%- include("partials/foot") %>
