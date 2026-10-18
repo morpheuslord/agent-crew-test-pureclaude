@@ -33,7 +33,7 @@ security-related operation (CLI command or own review). Format as defined in the
 - Interpretation: own analysis; no external source. Each item is a requirement to build in, not a defect in existing code.
 - Findings: F-001 to F-021
 - Action: applied to the design (`docs/ARCHITECTURE.md`, `docs/DECISIONS.md` D-001 to D-013); implementation follows in phases 3 to 7 and dispositions are updated as each one lands
-- Changes: docs/ARCHITECTURE.md, docs/DECISIONS.md (commit filled in below)
+- Changes: docs/ARCHITECTURE.md, docs/DECISIONS.md (commit 3cf61bc)
 - Notes: none
 
 ### T-004 | 2026-10-18T06:28:39Z | phase 3
@@ -44,7 +44,7 @@ security-related operation (CLI command or own review). Format as defined in the
 - Interpretation: own configuration work. The scanners were not run locally and their results were not read.
 - Findings: none
 - Action: applied. Scanner images pinned by digest and run with `docker run` instead of `aquasecurity/trivy-action`, whose tags were hijacked in a 2026 supply-chain incident (own knowledge); actions pinned by commit SHA.
-- Changes: .github/workflows/semgrep.yml, .github/workflows/trivy.yml, .semgrepignore, docs/DECISIONS.md D-016 (commit filled in below)
+- Changes: .github/workflows/semgrep.yml, .github/workflows/trivy.yml, .semgrepignore, docs/DECISIONS.md D-016 (commit 996d364)
 - Notes: Trivy reports Terraform misconfigurations in both categories (the filesystem job includes misconfig); the dedicated category is what the user asked for.
 
 ### T-005 | 2026-10-18T06:31:21Z | phase 3
@@ -55,6 +55,30 @@ security-related operation (CLI command or own review). Format as defined in the
 - Interpretation: splitting keeps every run and its per-run automation id, with each upload under the 20-run limit.
 - Findings: none
 - Action: applied. `codacy.yml`: the original upload step is replaced by a split step plus three upload steps (`codacy-1` to `codacy-3`, each only if its file exists); checkout, the Codacy CLI step and the jq category step are unchanged. `trivy.yml`: the Terraform job exits 0 with a notice when `infra/` has no `.tf` files; both Trivy uploads and the Semgrep upload run only when their SARIF file exists.
-- Changes: .github/workflows/codacy.yml, .github/workflows/trivy.yml, .github/workflows/semgrep.yml (commit filled in below)
+- Changes: .github/workflows/codacy.yml, .github/workflows/trivy.yml, .github/workflows/semgrep.yml (commit b559d56)
 - Notes: modifying `codacy.yml` deviates from section 10; done only on the user's explicit instruction, recorded in session-meta.md and DECISIONS D-017. Scanner findings in the pasted logs were not read or acted on.
+
+### T-006 | 2026-10-18T07:00:50Z | phase 3
+- Source: Self
+- Why: security review of the API code written in phase 3 against the design requirements F-001 to F-021, before committing
+- Input: `api/src/taskboard_api/**` and the unit/integration tests in `api/tests/`
+- Output: own review notes:
+  1. Passwords: Argon2id, length 10..128, never stripped; dummy verify for unknown emails. OK.
+  2. Sessions: 256-bit tokens, SHA-256 stored, absolute expiry, deleted on logout; other sessions deleted on password change; all on reset and deactivation; lookup uncached and checks is_active. OK.
+  3. Rate limits on register/login/forgot/reset/password-change; Redis keys hold a hash of the email, not the email. OK. Forgot-password still differs slightly in work done for existing vs unknown accounts (one insert); accepted, rate limited.
+  4. Reset link built from PUBLIC_UI_URL; tokens hashed, single use, 30 min, older ones invalidated. OK.
+  5. Object-level authorisation: every service entry point goes through AccessPolicy; cached task detail is re-authorised against its project before returning. 404 for non-readable. Tests cover cross-team access to teams, projects, tasks, comments, attachments, search.
+  6. Mass assignment: all commands extra="forbid"; role/is_active only via admin endpoint; admins can not demote/deactivate themselves.
+  7. Injection: sort column from an enum-keyed allow-list; search text bound and LIKE-escaped; no string-built SQL outside the test TRUNCATE.
+  8. SSRF: scheme/credential/port checks at save time; at send time every resolved address must be global unicast, connection pinned to the vetted IP with SNI/Host of the original name, no redirects, trust_env=False, 5 s timeout. IP literals, IPv4-mapped IPv6, link-local metadata address covered by tests.
+  9. Uploads: random 32-hex storage keys validated by regex and path containment; size counted while reading; body-size middleware; download as octet-stream attachment + nosniff; Content-Disposition reduced to safe ASCII plus RFC 5987 filename*.
+  10. FOUND: a chunked request body (no Content-Length) that exceeds the limit raised a plain exception inside receive(); FastAPI's form/body parsing converts unknown exceptions into a generic 400, so the client got 400 instead of 413 (the body was still not accepted). Recorded as F-022 and fixed by making the error an HTTPException(413).
+  11. CSV export prefixes = + - @ tab CR LF cells with an apostrophe.
+  12. Logs: access log has path only (no query string); validation errors return messages without input values; email bodies (with reset links) are logged only when MAILER_LOG_BODY=true.
+  13. Not covered by any limit: number/total size of attachments per user or task. Recorded as F-023, accepted risk for an internal tool.
+- Interpretation: own analysis. Item 10 confirmed by the new integration test `test_chunked_upload_over_limit_is_rejected_with_413` (failed before the change would have returned 400; the test was written together with the fix, so the pre-fix 400 was inferred from FastAPI's routing code, not observed in a test run).
+- Findings: F-022, F-023; dispositions of F-001, F-004 to F-008, F-010, F-012, F-016, F-018 to F-020 updated
+- Action: applied (F-022 fixed); F-023 accepted risk
+- Changes: api/src/taskboard_api/api/middleware.py, api/src/taskboard_api/api/errors.py, api/tests/integration/test_edges.py (fix in commit 24bd135; tests in the following test commit)
+- Notes: while writing the code I twice typed inline `# noqa` comments (SIM115 in services/files.py, N803 in a test fake) and one `# type: ignore`; all three were removed and the code restructured instead, before any commit. `evaluation/suppressions.md` stays "none".
 
