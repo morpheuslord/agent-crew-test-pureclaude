@@ -1,0 +1,9 @@
+# Copy to backend.hcl (git-ignored) and run: terraform init -backend-config=backend.hcl
+# The bucket should have versioning, default encryption (SSE-KMS), public access blocked and
+# access limited to the deployment role, because the state contains sensitive values.
+bucket       = "example-taskboard-terraform-state"
+key          = "taskboard/dev/terraform.tfstate"
+region       = "eu-west-1"
+encrypt      = true
+kms_key_id   = "arn:aws:kms:eu-west-1:111122223333:key/00000000-0000-0000-0000-000000000000"
+use_lockfile = true

@@ -1,0 +1,61 @@
+#!/bin/bash
+# Boots an API instance: installs Docker, builds the configuration from SSM Parameter Store and
+# Secrets Manager with the instance role, runs the database migrations, then runs the API image.
+# No secret is part of this script.
+set -euo pipefail
+umask 077
+
+REGION="${region}"
+dnf install -y docker
+systemctl enable --now docker
+
+param() {
+  aws ssm get-parameter --region "$REGION" --with-decryption --name "$1" \
+    --query Parameter.Value --output text
+}
+secret() {
+  aws secretsmanager get-secret-value --region "$REGION" --secret-id "$1" \
+    --query SecretString --output text
+}
+
+DB_SECRET="$(secret "${db_secret_arn}")"
+CACHE_TOKEN="$(secret "${cache_secret_arn}")"
+DATABASE_URL="$(DB_SECRET="$DB_SECRET" python3 -c '
+import json, os, urllib.parse as u
+s = json.loads(os.environ["DB_SECRET"])
+print("postgresql+psycopg://%s:%s@${db_host}:${db_port}/${db_name}?sslmode=require"
+      % (u.quote(s["username"], safe=""), u.quote(s["password"], safe="")))')"
+REDIS_URL="$(CACHE_TOKEN="$CACHE_TOKEN" python3 -c '
+import os, urllib.parse as u
+print("rediss://:%s@${cache_host}:${cache_port}/0" % u.quote(os.environ["CACHE_TOKEN"], safe=""))')"
+
+install -d -m 0700 /etc/taskboard
+{
+  echo "API_HOST=0.0.0.0"
+  echo "API_PORT=${port}"
+  echo "LOG_LEVEL=INFO"
+  echo "DATABASE_URL=$DATABASE_URL"
+  echo "REDIS_URL=$REDIS_URL"
+  echo "SERVICE_TOKEN=$(param "${service_token_parameter}")"
+  echo "PUBLIC_UI_URL=${public_ui_url}"
+  echo "STORAGE_BACKEND=s3"
+  echo "S3_BUCKET=${bucket}"
+  echo "S3_KMS_KEY_ID=${kms_key_arn}"
+  echo "AWS_REGION=$REGION"
+  echo "MAILER_LOG_BODY=false"
+} >/etc/taskboard/api.env
+chmod 0600 /etc/taskboard/api.env
+unset DB_SECRET CACHE_TOKEN DATABASE_URL REDIS_URL
+
+aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "${registry}"
+docker pull "${image}"
+
+COMMON=(--env-file /etc/taskboard/api.env --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m
+  --cap-drop ALL --security-opt no-new-privileges:true --pids-limit 512
+  --log-driver awslogs --log-opt awslogs-region="$REGION" --log-opt awslogs-group="${log_group}")
+
+# Migrations take a PostgreSQL advisory lock, so several instances can boot at once.
+docker run --rm "$${COMMON[@]}" "${image}" taskboard-api migrate
+
+docker run -d --name taskboard-api --restart unless-stopped "$${COMMON[@]}" \
+  -p ${port}:${port} --memory 1g "${image}"

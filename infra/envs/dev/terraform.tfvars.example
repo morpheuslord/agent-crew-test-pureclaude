@@ -1,0 +1,25 @@
+# Copy to terraform.tfvars (git-ignored) and adjust.
+region             = "eu-west-1"
+environment        = "dev"
+availability_zones = ["eu-west-1a", "eu-west-1b"]
+vpc_cidr           = "10.40.0.0/16"
+
+public_url      = "https://taskboard-dev.example.com"
+certificate_arn = "arn:aws:acm:eu-west-1:111122223333:certificate/00000000-0000-0000-0000-000000000000"
+
+# Who may reach the load balancer. Replace with office or VPN egress ranges.
+allowed_client_cidrs = ["203.0.113.0/24"]
+
+# Git SHA of the images CI pushed to the ECR repositories.
+image_tag = "0123456789abcdef0123456789abcdef01234567"
+
+ui_instance_count  = 2
+api_instance_count = 2
+instance_type      = "t3.small"
+
+db_instance_class = "db.t4g.small"
+db_multi_az       = false
+cache_node_type   = "cache.t4g.micro"
+
+deletion_protection = true
+secret_version      = 1
