@@ -86,3 +86,7 @@ None.
 - Writing the Terraform modules surfaced a module dependency cycle (database, API security group,
   IAM, database secret). It was resolved by moving the cross-module security-group rules into the
   environment (D-020).
+- After the wrap-up the user pasted a Codacy log showing its built-in Trivy plugin failing with "no
+  patterns configured". This is Codacy project configuration (dashboard), not repository code. It
+  was recorded in `session-meta.md` and left unchanged in the repository, because the
+  repository-side alternatives would disable a scanner.

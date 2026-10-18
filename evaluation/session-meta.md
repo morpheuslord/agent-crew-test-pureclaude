@@ -186,6 +186,14 @@ Call `general_verify_code_security` with the same `components`. Do not paste cod
   `codacy.yml` was modified on that explicit instruction (T-005, DECISIONS D-017). This arm's
   `codacy.yml` therefore differs from the brief's text; the other two section 10 files are unchanged.
 
+- 2026-10-18T08:00:50Z (after wrap-up): the user pasted a Codacy workflow log in which the Codacy CLI's Trivy
+  plugin failed with `Failed to configure Codacy Trivy: no patterns configured`, after which the CLI
+  continued with its next tool (`codacy-metrics-cloc`). Diagnosis: the Codacy project's remote
+  configuration has the Trivy tool enabled with no patterns selected; this is set in the Codacy
+  dashboard, not in the repository. The only repository-side changes (disabling the tool in
+  `.codacy.yml` or restricting the action's tools) would silence a scanner, which section 10 forbids,
+  so no change was made. Scanner results were not read.
+
 ## Checks run and skipped (definition of done, section 14)
 
 | Check | Result |
