@@ -9,7 +9,7 @@ and manage tasks with comments and attachments. Admins manage users.
 flowchart LR
     B[Browser] -- HTTPS --> ALB[Application Load Balancer]
     ALB -- HTTP, UI SG only --> UI[UI server<br/>Node.js 24 / Express 5 / EJS]
-    UI -- "HTTP, internal network<br/>X-Service-Token + Bearer session" --> API[API<br/>Python 3.13 / FastAPI]
+    UI -- "HTTP, internal network (internal ALB in AWS)<br/>X-Service-Token + Bearer session" --> API[API<br/>Python 3.13 / FastAPI]
     API --> PG[(PostgreSQL 16)]
     API --> R[(Redis 7<br/>cache + rate limits)]
     API --> S[(Attachment storage<br/>local volume / S3)]
@@ -24,8 +24,9 @@ flowchart LR
 | Redis | Cache-aside store and rate-limit counters. Optional: the API degrades to uncached reads and in-process rate limits | - |
 | Storage | Attachment bytes. `LocalFileStorage` in dev, `S3Storage` in AWS, behind the `AttachmentStorage` interface | - |
 
-The API is never reachable from outside: in Compose it has no published port, and in AWS it lives in
-private subnets behind a security group that only admits the UI instances.
+The API is never reachable from outside: in Compose it has no published port (only the UI is
+published, on 127.0.0.1), and in AWS the API instances and the internal load balancer in front of them
+live in private subnets behind security groups that only admit the UI instances (see DEPLOYMENT.md).
 
 ## Request flow
 
@@ -57,8 +58,10 @@ sequenceDiagram
     U-->>B: 200 HTML (CSP, HSTS, nosniff)
 ```
 
-The UI server generates a request id per incoming request (or accepts a well-formed incoming
-`X-Request-Id`), sends it to the API in `X-Request-Id`, and both services put it in every JSON log line.
+The UI server generates a fresh request id (UUID) for every incoming request, ignoring any id the
+browser sends, returns it in `X-Request-Id`, and sends it to the API in `X-Request-Id`. The API accepts
+the id only if it is at most 64 safe characters (otherwise it generates one). Both services put it in
+every JSON log line, including the API's webhook worker threads.
 
 ## Authentication design
 
@@ -86,7 +89,9 @@ The UI server generates a request id per incoming request (or accepts a well-for
   POST is accepted only if the field matches (constant-time compare) and, when the browser sends an
   `Origin` header, it equals `PUBLIC_URL`. This covers anonymous forms (login, register, reset) too.
 - **Rate limits** (API, fixed window, Redis with in-process fallback): login per email and per client
-  IP, forgot-password per email and per IP, register and reset per IP. Exceeding a limit returns 429.
+  IP, forgot-password per email and per IP, register and reset per IP, password change per user.
+  Exceeding a limit returns 429 with `Retry-After`. Redis keys contain a hash of the email, not the
+  email itself.
 - **Password reset.** `forgot` always returns 202. If the account exists and is active, the API stores
   the SHA-256 of a random token with a 30-minute expiry, invalidates older unused tokens, and "sends" an
   email containing `PUBLIC_UI_URL/reset-password?token=...` (built from configuration, never from the
@@ -219,6 +224,10 @@ erDiagram
   storage after the transaction commits. Activity rows keep their history (`task_id` is not a foreign
   key) so the feed survives deletes.
 - Removing a member from a team unassigns them from that team's tasks.
+- Activity event types: `task.created`, `task.updated` (with the changed field names),
+  `task.status_changed` (old and new status), `task.deleted`, `comment.added`, `attachment.added`,
+  `member.added`, `member.removed`. A project's feed shows its own events plus its team's membership
+  events; the admin feed shows everything.
 - Every schema change is an Alembic migration (`api/migrations/`). The app never calls `create_all`
   outside tests. Migrations take a PostgreSQL advisory lock so several API instances can start at once.
 
@@ -246,8 +255,10 @@ flowchart TB
 
 ## API contract
 
-Base path `/api/v1`, JSON bodies, OpenAPI at `/api/v1/openapi.json` (internal only). All `/api/v1` routes
-need `X-Service-Token`; all except register, login, forgot and reset need a bearer session.
+Base path `/api/v1`, JSON bodies. The OpenAPI document (`/api/v1/openapi.json`, Swagger UI at
+`/api/v1/docs`) is served without credentials, which is acceptable only because the API is reachable
+from the internal network alone. All other `/api/v1` routes need `X-Service-Token`; all except register,
+login, forgot and reset also need a bearer session.
 Error bodies are `{"error": {"code": "...", "message": "...", "fields": {...}}}`.
 
 | Method and path | Purpose | Notes |
@@ -279,7 +290,7 @@ Error bodies are `{"error": {"code": "...", "message": "...", "fields": {...}}}`
 | `GET /admin/users`, `PATCH /admin/users/{id}` | list users, change role or active flag | admin |
 | `GET /admin/activity` | global feed | admin |
 | `GET /admin/cache-stats` | cache hit/miss counters | admin |
-| `GET /healthz`, `GET /readyz` | liveness, readiness (DB required, Redis reported) | no auth |
+| `GET /healthz`, `GET /readyz` | liveness, readiness (database and storage required, Redis reported as ok/degraded) | no auth |
 
 Lists return `{"items": [...], "page": n, "page_size": n, "total": n}`; `page_size` is capped at 100.
 `sort` must be one of the task fields (`title`, `description`, `status`, `priority`, `assignee_id`,
@@ -326,8 +337,12 @@ Cache-aside behind the `Cache` interface (`RedisCache`, `InMemoryCache`, `NullCa
 | `tb:task:{id}` | task detail DTO | task update or delete; member removal (unassign) |
 
 - Invalidation happens after the database commit. TTL (`CACHE_TTL_SECONDS`, default 300) is a backstop.
-- Authorisation runs before every cache read: cached data is never served to a caller who fails the
-  membership check, and per-user keys only hold that user's own data.
+- Authorisation always uses the database, never the cache. Task lists are read from the cache only
+  after the project membership check; a cached task detail is returned only after the caller passes
+  the membership check for that task's project. Per-user keys only hold that user's own data, and
+  values are JSON validated by Pydantic (nothing is unpickled).
+- While Redis is down, invalidations are skipped too, so entries cached before an outage can be
+  served for up to one TTL after Redis returns. Only display data can be stale (see F-024).
 - Every get records a hit or miss in thread-safe counters and logs it at debug level with the counters.
   Admins can read the counters at `GET /api/v1/admin/cache-stats`.
 - Redis errors are caught and logged; after a failure the cache stops calling Redis for 30 seconds and
@@ -344,5 +359,13 @@ Cache-aside behind the `Cache` interface (`RedisCache`, `InMemoryCache`, `NullCa
 - Middleware classes: request id and logging, security headers (Helmet with a strict CSP and no inline
   scripts), CSRF, session (loads the current user through `/auth/me`), flash messages (signed cookie),
   error handling.
-- Uploads go through `multer` in memory with a 10 MB limit, then to the API as multipart. Downloads are
-  streamed from the API with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+- Uploads go through `multer` in memory with a 10 MB limit, then to the API as multipart. Multipart
+  bodies are parsed only on the upload route, before CSRF verification, and refused with 415 on any
+  other route. Downloads are streamed from the API with `Content-Disposition: attachment` and
+  `X-Content-Type-Options: nosniff`.
+- Route ids are checked against a UUID pattern before any API call; every redirect target is a
+  constant or built from such an id, so there are no open redirects.
+- Configuration is validated with zod at startup (`ui/src/config.ts`): `API_BASE_URL`, `SERVICE_TOKEN`,
+  `UI_SECRET`, `PUBLIC_URL`, `COOKIE_SECURE`, `TRUST_PROXY`, `API_REQUEST_TIMEOUT_MS`, `MAX_UPLOAD_BYTES`,
+  `HOST`, `PORT`, `LOG_LEVEL`. The API's settings are in `api/src/taskboard_api/config.py`; both are
+  listed in `.env.example`.

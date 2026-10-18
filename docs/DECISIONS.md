@@ -140,3 +140,91 @@ tool's output.
   the Security tab.
 - Driver: tool output (CI logs pasted by the user) and an explicit user instruction to change the
   otherwise frozen file.
+
+## D-018 Internal load balancer in front of the API instances in AWS
+
+- Decision: the `api` module also creates an internal ALB in the private subnets; the UI calls it
+  over HTTP on port 80 and it forwards to the API instances on 8000, health checking `/readyz`.
+- Reason: the brief asks for several API instances; something must spread UI calls across them and
+  stop sending to unhealthy instances. The brief's module list has no internal load balancer module,
+  so it lives with the API it serves.
+- Driver: brief (sections 2 and 6); own judgment.
+
+## D-019 Configuration and secrets fetched at boot, not baked into user_data
+
+- Decision: `user_data` contains only URLs and parameter/secret names. At boot it reads the service
+  token and UI secret from SSM SecureStrings and the database credentials (RDS-managed) and cache
+  token from Secrets Manager, writes a 0600 env file and starts the container with it. The service
+  token and UI secret are ephemeral random values written with write-only arguments, so they are not
+  in Terraform state.
+- Reason: user_data is readable through the EC2 API and IMDS; images are shared across environments.
+- Driver: brief (section 6 leaves this open); own judgment.
+
+## D-020 Cross-module security group rules live in the environment
+
+- Decision: each module creates its own security group; the rules connecting groups are in
+  `infra/envs/dev/security_rules.tf`.
+- Reason: passing groups between modules created a cycle (database needs the API group, the API
+  needs the IAM profile, IAM needs the database secret ARN). Keeping the rules together also makes
+  the whole traffic path reviewable in one file.
+- Driver: own judgment (found while writing the modules).
+
+## D-021 Request and response schemas are the domain models
+
+- Decision: routers use the Pydantic commands in `domain/commands.py` as request bodies and the DTOs
+  in `domain/dtos.py` as responses instead of duplicating them in `api/`.
+- Reason: one definition of each shape and its validation, shared by services, cache serialisation
+  and OpenAPI; the `api` layer still owns routing, parameters, errors and HTTP specifics.
+- Driver: own judgment.
+
+## D-022 Webhooks signed with a per-project secret
+
+- Decision: when a webhook URL is set, the project gets a random signing secret, shown only to the
+  owner and admins; deliveries carry `X-Taskboard-Signature: sha256=<HMAC of the body>`.
+- Reason: lets receivers reject forged calls; per project so a leaked secret affects one project.
+- Driver: own judgment.
+
+## D-023 No client-side JavaScript in the UI
+
+- Decision: every page is server-rendered HTML with plain forms; the CSP sets `script-src 'none'`.
+- Reason: removes a whole class of XSS impact and keeps the UI small; nothing in the brief needs
+  client-side behaviour.
+- Driver: own judgment.
+
+## D-024 Random UUID identifiers
+
+- Decision: every primary key is a random UUID (v4).
+- Reason: ids can not be enumerated or used to estimate counts, which complements the 404-for-
+  unreadable rule (D-004).
+- Driver: own judgment.
+
+## D-025 Email bodies logged only when MAILER_LOG_BODY is true
+
+- Decision: the outbox mailer always writes the email to the `outbox` table and logs that it did;
+  the body (which may contain a reset link) is logged only when `MAILER_LOG_BODY=true`, the default
+  for local development. Terraform sets it to false in AWS.
+- Reason: the brief requires emails in the API log for development, but reset links in production
+  logs would let anyone with log access take over accounts.
+- Driver: brief (section 4.1); own judgment.
+
+## D-026 Idempotent admin bootstrap that never resets passwords
+
+- Decision: `taskboard-api create-admin` creates the admin from `ADMIN_EMAIL`/`ADMIN_PASSWORD`, or
+  promotes and reactivates an existing account without touching its password.
+- Reason: safe to re-run from automation; an attacker who can set the environment variables still
+  can not silently change an existing admin's password.
+- Driver: brief (section 4.1); own judgment.
+
+## D-027 Separate Compose file for test databases
+
+- Decision: `docker-compose.test.yml` runs throwaway PostgreSQL and Redis (tmpfs, loopback-only ports)
+  for the API integration tests; the application stack in `docker-compose.yml` publishes only the UI.
+- Reason: tests need direct database access; the application stack must not expose it.
+- Driver: brief (section 7); own judgment.
+
+## D-028 UI timeout variable named API_REQUEST_TIMEOUT_MS
+
+- Decision: the UI's API timeout setting is `API_REQUEST_TIMEOUT_MS`, not `API_TIMEOUT_MS`.
+- Reason: `API_TIMEOUT_MS` was already exported in the build environment by another tool with a value
+  the validation rejects; a more specific name avoids such collisions.
+- Driver: tool output (the UI's startup validation error during the local end-to-end run).
