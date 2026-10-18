@@ -9,9 +9,9 @@ Written last, after every other evaluation file.
 | Source | Entries | IDs |
 | --- | --- | --- |
 | MCP | 0 | none |
-| CLI | 3 | T-001 `npm audit`, T-002 `uvx pip-audit`, T-011 `git grep` (suppressions and secrets) |
+| CLI | 4 | T-001 `npm audit`, T-002 `uvx pip-audit`, T-011 `git grep` (suppressions and secrets), T-013 `gh api` export of GitHub code scanning alerts (user request, after the build) |
 | Self (own review / configuration work) | 9 | T-003 design threat review, T-004 Semgrep/Trivy workflows (user request), T-005 Codacy/Trivy CI fixes (user request), T-006 API review, T-007 cache review, T-008 UI review, T-009 infrastructure review, T-010 containers/CI review, T-012 Codacy limited to the tools that succeed (user request) |
-| Total | 12 | |
+| Total | 13 | |
 
 ### Findings by source and disposition (`findings.md`)
 
@@ -93,3 +93,6 @@ None.
 - The user then asked to keep only the Codacy tools that were green in GitHub's code scanning tool list.
   `codacy.yml` now runs nine tools as a per-tool matrix (`513b2d1`); ten failing Codacy tools no longer
   run. This is recorded in `suppressions.md`, which is therefore no longer "none".
+- At the user's request, after everything else, the GitHub code scanning alerts (4234: 4195 open,
+  39 fixed) were exported to `github-code-scanning-alerts.csv` (T-013). They were not triaged and are
+  not part of `findings.md`. `complete-evaluation.md` concatenates all evaluation files.

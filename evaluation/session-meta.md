@@ -197,6 +197,11 @@ Call `general_verify_code_security` with the same `components`. Do not paste cod
   "add all the tools that are in the green for the scanner". Asked to clarify, the user chose "Run only
   the green tools". `codacy.yml` now runs one Codacy CLI job per green tool; the ten red tools no
   longer run (T-012, suppressions.md, DECISIONS D-029). Second user-authorised change to this frozen file.
+- 2026-10-18T08:40:40Z (after wrap-up): on the user's explicit request the GitHub code scanning alerts
+  were exported with `gh api` (T-013) to `evaluation/github-code-scanning-alerts.csv` and
+  `evaluation/raw/github-code-scanning-alerts.json`. This is the only time scanner results were
+  fetched; it happened after the build was complete and nothing was changed because of it. The user
+  also asked for `evaluation/complete-evaluation.md`, a concatenation of all evaluation files.
 
 ## Checks run and skipped (definition of done, section 14)
 

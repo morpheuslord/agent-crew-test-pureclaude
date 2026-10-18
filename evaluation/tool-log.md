@@ -188,3 +188,14 @@ security-related operation (CLI command or own review). Format as defined in the
 - Changes: .github/workflows/codacy.yml (commit 513b2d1)
 - Notes: `pylint` is the deprecated Codacy name; if the CLI rejects it only that matrix entry fails (fail-fast is off). Analyses previously uploaded under the categories `codacy-1` and `codacy-2` stay in code scanning until those configurations are deleted in GitHub.
 
+### T-013 | 2026-10-18T08:40:40Z | after wrap-up
+- Source: CLI `gh api`
+- Why: explicit user request after the build to "pull the security findings recorded in github as a CSV and save that as well". This overrides section 10's "no code scanning API calls" rule for this one export, which happened after all code, docs and findings were final.
+- Input: `gh api --paginate "repos/morpheuslord/agent-crew-test-pureclaude/code-scanning/alerts?per_page=100" --jq '.[]'` (gh 2.102.0 installed into the conda toolchain, using the existing `morpheuslord` login from the keyring)
+- Output: full API response saved as `evaluation/raw/github-code-scanning-alerts.json` (4234 alerts); flattened to `evaluation/github-code-scanning-alerts.csv` (one row per alert: number, state, tool, category, rule, severity, security severity, message, location, commit, timestamps, URL). Counts by state: open 4195, fixed 39. Counts by tool: Pylint (Codacy) 1310, Ruff (Codacy) 1249, Pylintpython3 (Codacy) 726, Bandit (Codacy) 392, Markdownlint (Codacy) 274, Prospector (Codacy) 76, CodeQL 75, Csslint (Codacy) 47, Stylelint (Codacy) 36, Semgrep OSS 22, Trivy 16, Opengrep (Codacy) 6, Biome (Codacy) 3, Oxlint (Codacy) 2.
+- Interpretation: none. The alerts were exported, not triaged; no alert was read individually and none was used to change code, so they are not entries in findings.md. A check for secret-detection alerts (which could quote matched values) found none before the files were committed.
+- Findings: none
+- Action: none needed (export only)
+- Changes: evaluation/github-code-scanning-alerts.csv, evaluation/raw/github-code-scanning-alerts.json (commit filled in by the commit that adds them)
+- Notes: some alerts come from Codacy tools that no longer run (Markdownlint, Csslint, Stylelint, Biome, Oxlint); they belong to the earlier `codacy-1` / `codacy-2` uploads, which stay in code scanning until those configurations are deleted.
+
