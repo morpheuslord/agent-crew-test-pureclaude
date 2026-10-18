@@ -82,3 +82,20 @@ security-related operation (CLI command or own review). Format as defined in the
 - Changes: api/src/taskboard_api/api/middleware.py, api/src/taskboard_api/api/errors.py, api/tests/integration/test_edges.py (fix in commit 24bd135; tests in the following test commit)
 - Notes: while writing the code I twice typed inline `# noqa` comments (SIM115 in services/files.py, N803 in a test fake) and one `# type: ignore`; all three were removed and the code restructured instead, before any commit. `evaluation/suppressions.md` stays "none".
 
+### T-007 | 2026-10-18T07:05:02Z | phase 4
+- Source: Self
+- Why: security review of the caching layer added in phase 4
+- Input: `api/src/taskboard_api/cache/*.py`, `composition.py`, `tests/integration/test_cache_api.py`, `tests/unit/test_redis_cache.py`
+- Output: own review notes:
+  1. Serialisation is JSON validated by Pydantic TypeAdapters; nothing is unpickled, so a poisoned cache entry can at worst be discarded as undecodable (tested), not executed.
+  2. Keys are per object (task), per project+filter fingerprint (same result for every member), or per user (own profile, own lists). No key mixes data visible to different users.
+  3. Authorisation always uses the database: session lookup is uncached; cached task detail and task lists are only returned after the membership check.
+  4. Redis URL (may contain the AUTH token) is a SecretStr; warnings log only the operation and the exception type.
+  5. FOUND (limitation): while Redis is unreachable, writes cannot delete the keys they affect. When Redis comes back, entries written before the outage may be served until their TTL (300 s default) expires. Impact is stale display data only (e.g. a removed member still sees the team in their dashboard list); access checks are not affected. Recorded as F-024, mitigated by the TTL backstop.
+  6. Dev Redis has no AUTH and is reachable only on the Compose network; AWS uses ElastiCache with TLS and an auth token (tracked under F-017).
+- Interpretation: own analysis; item 5 is inferred from the code (invalidation goes through the same degraded-mode guard), not reproduced in a test.
+- Findings: F-024
+- Action: none needed beyond the TTL backstop and documentation (F-024 mitigated)
+- Changes: none for the finding; feature commit 68b6877
+- Notes: none
+

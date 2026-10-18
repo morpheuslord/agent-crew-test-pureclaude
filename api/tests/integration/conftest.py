@@ -12,11 +12,10 @@ from pathlib import Path
 import pytest
 from alembic import command
 from fastapi.testclient import TestClient
+from redis import Redis
 from sqlalchemy import Engine, create_engine, text
 
 from taskboard_api.api.app import create_app
-from taskboard_api.cache.interface import Cache
-from taskboard_api.cache.memory import NullCache
 from taskboard_api.cli import alembic_config
 from taskboard_api.composition import Container
 from taskboard_api.config import Settings
@@ -64,9 +63,12 @@ def clean_engine(engine: Engine) -> Engine:
     return engine
 
 
-def make_settings(database_url: str, tmp_path: Path, **overrides: object) -> Settings:
+def make_settings(
+    database_url: str, tmp_path: Path, redis_url: str | None = None, **overrides: object
+) -> Settings:
     values: dict[str, object] = {
         "database_url": database_url,
+        "redis_url": redis_url,
         "service_token": SERVICE_TOKEN,
         "public_ui_url": "http://ui.test:3000",
         "storage_local_path": str(tmp_path / "attachments"),
@@ -79,9 +81,11 @@ def make_settings(database_url: str, tmp_path: Path, **overrides: object) -> Set
 
 
 @pytest.fixture
-def cache_backend() -> Cache:
-    """Overridden in the cache tests to use real Redis."""
-    return NullCache()
+def clean_redis(redis_url: str) -> str:
+    client = Redis.from_url(redis_url)
+    client.flushdb()
+    client.close()
+    return redis_url
 
 
 @dataclass
@@ -91,16 +95,26 @@ class Harness:
     notifier: RecordingNotifier
 
 
+def build_harness(settings: Settings, engine: Engine, tmp_path: Path) -> Container:
+    """A container using real PostgreSQL and Redis; only webhooks and storage location are fixed."""
+    return Container(
+        settings,
+        engine=engine,
+        storage=LocalFileStorage(tmp_path / "attachments"),
+        notifier=RecordingNotifier(),
+        hasher=Argon2PasswordHasher(1, 8),
+    )
+
+
 @pytest.fixture
 def harness(
-    database_url: str, clean_engine: Engine, tmp_path: Path, cache_backend: Cache
+    database_url: str, clean_engine: Engine, clean_redis: str, tmp_path: Path
 ) -> Iterator[Harness]:
-    settings = make_settings(database_url, tmp_path)
+    settings = make_settings(database_url, tmp_path, clean_redis)
     notifier = RecordingNotifier()
     container = Container(
         settings,
         engine=clean_engine,
-        cache=cache_backend,
         storage=LocalFileStorage(tmp_path / "attachments"),
         notifier=notifier,
         hasher=Argon2PasswordHasher(1, 8),
