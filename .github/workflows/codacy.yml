@@ -10,12 +10,29 @@ permissions:
 
 jobs:
   codacy:
-    name: Codacy analysis
+    # One Codacy CLI run per tool. Only the tools that analyse this repository successfully are
+    # listed (Agentlinter, Biome, ESLint 9, Jacksonlinter, JSHint, Markdownlint, Oxlint, PMD, PMD 7
+    # and remark-lint failed and were removed at the repository owner's request). Each tool uploads
+    # under its own category, which also keeps every upload under code scanning's 20-run limit.
+    name: Codacy analysis (${{ matrix.tool }})
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        tool:
+          - bandit
+          - checkov
+          - lizard
+          - opengrep
+          - prospector
+          - pylint
+          - pylintpython3
+          - ruff
+          - spectral
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -26,6 +43,7 @@ jobs:
         uses: codacy/codacy-analysis-cli-action@v4
         with:
           project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          tool: ${{ matrix.tool }}
           verbose: true
           output: results.sarif
           format: sarif
@@ -33,43 +51,14 @@ jobs:
           max-allowed-issues: 2147483647
 
       - name: Give each SARIF run its own category
+        if: hashFiles('results.sarif') != ''
         run: |
           jq '.runs |= (to_entries | map(.value + {automationDetails: {id: ("codacy/" + (.value.tool.driver.name // "codacy") + "/" + (.key | tostring))}}))' results.sarif > results.fixed.sarif
           mv results.fixed.sarif results.sarif
 
-      # Code scanning accepts at most 20 runs per SARIF file, and Codacy emits one run per tool
-      # invocation (31 at the time of writing), so split the runs into files of 20 and upload each.
-      - name: Split SARIF into files of at most 20 runs
-        run: |
-          total=$(jq '.runs | length' results.sarif)
-          parts=$(( (total + 19) / 20 ))
-          echo "SARIF has ${total} runs, writing ${parts} file(s)"
-          if [ "${parts}" -gt 3 ]; then
-            echo "::error::${total} runs need ${parts} uploads; add more upload steps below"
-            exit 1
-          fi
-          for part in $(seq 1 "${parts}"); do
-            start=$(( (part - 1) * 20 ))
-            jq --argjson s "${start}" '.runs |= .[$s:$s + 20]' results.sarif > "codacy-${part}.sarif"
-          done
-
-      - name: Upload SARIF to code scanning (runs 1-20)
-        if: hashFiles('codacy-1.sarif') != ''
+      - name: Upload SARIF to code scanning
+        if: hashFiles('results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: codacy-1.sarif
-          category: codacy-1
-
-      - name: Upload SARIF to code scanning (runs 21-40)
-        if: hashFiles('codacy-2.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: codacy-2.sarif
-          category: codacy-2
-
-      - name: Upload SARIF to code scanning (runs 41-60)
-        if: hashFiles('codacy-3.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: codacy-3.sarif
-          category: codacy-3
+          sarif_file: results.sarif
+          category: codacy-${{ matrix.tool }}
