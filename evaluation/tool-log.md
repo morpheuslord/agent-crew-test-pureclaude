@@ -196,6 +196,6 @@ security-related operation (CLI command or own review). Format as defined in the
 - Interpretation: none. The alerts were exported, not triaged; no alert was read individually and none was used to change code, so they are not entries in findings.md. A check for secret-detection alerts (which could quote matched values) found none before the files were committed.
 - Findings: none
 - Action: none needed (export only)
-- Changes: evaluation/github-code-scanning-alerts.csv, evaluation/raw/github-code-scanning-alerts.json (commit filled in by the commit that adds them)
+- Changes: evaluation/github-code-scanning-alerts.csv, evaluation/raw/github-code-scanning-alerts.json (commit 3a6f3cd)
 - Notes: some alerts come from Codacy tools that no longer run (Markdownlint, Csslint, Stylelint, Biome, Oxlint); they belong to the earlier `codacy-1` / `codacy-2` uploads, which stay in code scanning until those configurations are deleted.
 
