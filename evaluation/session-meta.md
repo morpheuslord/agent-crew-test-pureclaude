@@ -165,3 +165,10 @@ Call `general_verify_code_security` with the same `components`. Do not paste cod
   skills before any action. Section 0 rule 2 forbids skills, so no skill was invoked.
 - The harness supplied a reminder to end commit messages with a `Co-Authored-By` trailer. Section 11
   and the user's global instructions forbid trailers, so none were added.
+
+## Events during the session
+
+- 2026-10-18T06:21:14Z (phase 2): the user pasted a CodeQL error from the first push into the chat ("CodeQL detected
+  code written in GitHub Actions and JavaScript/TypeScript, but not any written in Python"). Cause: the
+  bootstrap commit had `api/pyproject.toml` but no `.py` files. Response: the phase 2 commit adds the
+  first API Python modules. `codeql.yml` was not modified, and no scanner results were fetched or read.

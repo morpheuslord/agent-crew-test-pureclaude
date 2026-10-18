@@ -25,3 +25,14 @@ security-related operation (CLI command or own review). Format as defined in the
 - Changes: none
 - Notes: none
 
+### T-003 | 2026-10-18T06:21:14Z | phase 2
+- Source: Self
+- Why: design-time threat review of the architecture before writing service code (authentication, authorisation, user-supplied URLs, uploads, rendering, export, infrastructure)
+- Input: the brief (sections 2 to 7) and the draft `docs/ARCHITECTURE.md`
+- Output: list of security requirements, recorded as F-001 to F-021 in `evaluation/findings.md`
+- Interpretation: own analysis; no external source. Each item is a requirement to build in, not a defect in existing code.
+- Findings: F-001 to F-021
+- Action: applied to the design (`docs/ARCHITECTURE.md`, `docs/DECISIONS.md` D-001 to D-013); implementation follows in phases 3 to 7 and dispositions are updated as each one lands
+- Changes: docs/ARCHITECTURE.md, docs/DECISIONS.md (commit filled in below)
+- Notes: none
+
