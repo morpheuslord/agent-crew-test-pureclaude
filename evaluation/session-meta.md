@@ -6,7 +6,7 @@
 | Model | Opus 5.5 (`claude-opus-5-5`) |
 | Claude Code version | `2.1.296 (Claude Code)` (from `claude --version`) |
 | Start time (UTC) | 2026-10-18T06:13:25Z (first `date -u` of the session) |
-| End time (UTC) | see bottom of this file |
+| End time (UTC) | 2026-10-18T07:55:00Z (approximate; last `date -u` before writing the summary was 2026-10-18T07:53:03Z) |
 
 ## Git identity (recorded before the first commit)
 
@@ -185,3 +185,23 @@ Call `general_verify_code_security` with the same `components`. Do not paste cod
   this also" and pasted the Trivy Terraform job failure (`lstat infra: no such file or directory`).
   `codacy.yml` was modified on that explicit instruction (T-005, DECISIONS D-017). This arm's
   `codacy.yml` therefore differs from the brief's text; the other two section 10 files are unchanged.
+
+## Checks run and skipped (definition of done, section 14)
+
+| Check | Result |
+| --- | --- |
+| `make lint` | passed (ruff check, ruff format --check, eslint, prettier --check) |
+| `make typecheck` | passed (mypy --strict: 96 files; tsc --noEmit) |
+| `make test` | passed: API 152 tests, coverage 98.09% (threshold 80%); UI 54 tests, line coverage 96.18% (threshold 80%). API integration tests ran against native PostgreSQL 16.15 and Redis 7.4.7 started from the conda toolchain (`TEST_DATABASE_URL`, `TEST_REDIS_URL`). |
+| `make tf-check` | passed (fmt -check -recursive, init -backend=false, validate) |
+| `docker compose up --build` | **skipped: Docker daemon not accessible** (see Environment). `docker compose --env-file .env.example config -q` (needs no daemon) passed for both Compose files. |
+| `make smoke` | **skipped in its Compose form** for the same reason. The same `scripts/smoke.sh` was run twice against the API and UI running as native processes (API: `taskboard-api serve` on native PostgreSQL/Redis; UI: `node dist/server.js` built from the same sources), passing every step both times (2026-10-18T07:26Z and 07:52Z). |
+| Docker image builds | not run locally; the CI job `images` builds both Dockerfiles. The API wheel was built and `taskboard-api migrate` run from a clean virtualenv to check the packaging the image relies on. |
+| `terraform plan` / `apply` | not run, as the brief requires (no AWS credentials). |
+
+## Tool use summary
+
+- MCP tool calls: none. No MCP tool was called at any point; there are no PROTOCOL VIOLATION entries.
+- Skills, plugins, slash commands: none invoked.
+- Subagents: none used.
+- Built-in tools used: file read/write/edit, shell, and web/registry lookups (Docker Hub tags API, `git ls-remote`, semgrep.dev rule pack URLs and docs) for pinning versions.

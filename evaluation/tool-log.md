@@ -159,3 +159,21 @@ security-related operation (CLI command or own review). Format as defined in the
 - Changes: Dockerfiles a2ade1a, Compose/Makefile/.env.example 5c8ed75, CI ce303c2
 - Notes: none
 
+### T-011 | 2026-10-18T07:53:03Z | phase 8
+- Source: CLI `git grep`
+- Why: final check that no suppression comments and no secrets are committed
+- Input: `git grep -nE "noqa|eslint-disable|type: ?ignore|@ts-ignore|@ts-expect-error|nosec|nosemgrep|tfsec:ignore|trivy:ignore|checkov:skip|pragma: no cover|codacy:" -- . ':!evaluation'`; `git grep -nIE "AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]+|sk-[A-Za-z0-9]{20,}" -- . ':!evaluation'`; `git ls-files | grep -E '(^|/)\.env($|\.)|backend\.hcl$|\.tfvars$|\.tfstate'`
+- Output:
+  ```
+  == suppressions
+  .github/workflows/codacy.yml:12:  codacy:
+  == secret patterns
+  == tracked env files
+  .env.example
+  ```
+- Interpretation: the one suppression-pattern hit is the job id `codacy:` in the Codacy workflow, not a suppression. No secret-shaped strings are tracked; the only env-style file tracked is the placeholder `.env.example`.
+- Findings: none
+- Action: none needed
+- Changes: none
+- Notes: none
+
