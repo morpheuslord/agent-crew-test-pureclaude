@@ -1,0 +1,128 @@
+# Local stack: only the UI server is published, and only on the loopback interface.
+# The API, PostgreSQL and Redis are reachable on the internal Compose networks only.
+# Copy .env.example to .env and fill in the secrets first.
+name: taskboard
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+x-api-environment: &api-environment
+  DATABASE_URL: postgresql+psycopg://taskboard:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/taskboard
+  REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
+  SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
+  PUBLIC_UI_URL: ${PUBLIC_URL:-http://localhost:3000}
+  STORAGE_BACKEND: local
+  STORAGE_LOCAL_PATH: /var/lib/taskboard/attachments
+  MAILER_LOG_BODY: ${MAILER_LOG_BODY:-true}
+  WEBHOOK_ALLOW_HTTP: ${WEBHOOK_ALLOW_HTTP:-false}
+  WEBHOOK_ALLOW_PRIVATE_TARGETS: ${WEBHOOK_ALLOW_PRIVATE_TARGETS:-false}
+  LOG_LEVEL: ${API_LOG_LEVEL:-INFO}
+  ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+  ADMIN_DISPLAY_NAME: ${ADMIN_DISPLAY_NAME:-Administrator}
+
+services:
+  postgres:
+    image: postgres:16.15-alpine3.24@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    environment:
+      POSTGRES_DB: taskboard
+      POSTGRES_USER: taskboard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [data]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskboard -d taskboard"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4.11-alpine3.21@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+    networks: [data]
+    # The image entrypoint drops from root to the redis user with gosu, which needs SETUID/SETGID.
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
+    restart: unless-stopped
+
+  migrate:
+    build: ./api
+    image: taskboard-api:local
+    command: ["taskboard-api", "migrate"]
+    environment: *api-environment
+    networks: [data]
+    <<: *hardening
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: ./api
+    image: taskboard-api:local
+    environment: *api-environment
+    volumes:
+      - attachments:/var/lib/taskboard/attachments
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    networks: [app, data]
+    <<: *hardening
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ui:
+    build: ./ui
+    image: taskboard-ui:local
+    environment:
+      API_BASE_URL: http://api:8000
+      SERVICE_TOKEN: ${SERVICE_TOKEN:?set SERVICE_TOKEN in .env}
+      UI_SECRET: ${UI_SECRET:?set UI_SECRET in .env}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: "0"
+      LOG_LEVEL: ${UI_LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:${UI_PORT:-3000}:3000"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    networks: [app]
+    <<: *hardening
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  # UI <-> API. Not internal, so the UI port can be published and the API can send webhooks.
+  app: {}
+  # API <-> PostgreSQL/Redis, with no route to the outside world.
+  data:
+    internal: true
+
+volumes:
+  pgdata: {}
+  attachments: {}
