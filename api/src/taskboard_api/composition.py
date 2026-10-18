@@ -12,12 +12,14 @@ from typing import Annotated, cast
 
 import boto3
 from fastapi import Depends, Request
+from redis import Redis
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from taskboard_api.cache.interface import Cache
 from taskboard_api.cache.memory import NullCache
+from taskboard_api.cache.redis_cache import RedisCache
 from taskboard_api.cache.taskboard_cache import TaskboardCache
 from taskboard_api.clock import Clock, SystemClock
 from taskboard_api.config import Settings
@@ -25,7 +27,12 @@ from taskboard_api.mailer.outbox import OutboxMailer
 from taskboard_api.repositories.interfaces import UnitOfWork
 from taskboard_api.repositories.sql.uow import SqlUnitOfWork
 from taskboard_api.security.passwords import Argon2PasswordHasher, PasswordHasher
-from taskboard_api.security.rate_limit import InMemoryRateLimiter, RateLimiter
+from taskboard_api.security.rate_limit import (
+    FallbackRateLimiter,
+    InMemoryRateLimiter,
+    RateLimiter,
+    RedisRateLimiter,
+)
 from taskboard_api.services.admin import AdminService
 from taskboard_api.services.attachments import AttachmentService
 from taskboard_api.services.auth import AuthPolicy, AuthService, RateLimitRule
@@ -64,14 +71,15 @@ class Container:
             pool_pre_ping=True,
         )
         self.session_factory = sessionmaker(self.engine, expire_on_commit=False)
-        self.cache_backend = cache or NullCache()
+        self.redis = self._build_redis(settings)
+        self.cache_backend = cache or self._build_cache(settings, self.redis)
         self.cache = TaskboardCache(self.cache_backend, settings.cache_ttl_seconds)
         self.storage = storage or self._build_storage(settings)
         self.notifier = notifier or self._build_notifier(settings)
         self.hasher = hasher or Argon2PasswordHasher(
             settings.argon2_time_cost, settings.argon2_memory_cost_kib
         )
-        self.rate_limiter = rate_limiter or InMemoryRateLimiter()
+        self.rate_limiter = rate_limiter or self._build_rate_limiter(self.redis)
         self.clock = clock or SystemClock()
         self.auth_policy = _auth_policy(settings)
 
@@ -89,7 +97,34 @@ class Container:
 
     def close(self) -> None:
         self.notifier.close()
+        if self.redis is not None:
+            self.redis.close()
         self.engine.dispose()
+
+    @staticmethod
+    def _build_redis(settings: Settings) -> Redis | None:
+        if settings.redis_url is None:
+            return None
+        return Redis.from_url(
+            settings.redis_url.get_secret_value(),
+            decode_responses=True,
+            socket_timeout=settings.redis_socket_timeout_seconds,
+            socket_connect_timeout=settings.redis_socket_timeout_seconds,
+            health_check_interval=30,
+        )
+
+    @staticmethod
+    def _build_cache(settings: Settings, redis: Redis | None) -> Cache:
+        if redis is None or not settings.cache_enabled:
+            logger.info("cache disabled: no REDIS_URL or CACHE_ENABLED=false")
+            return NullCache()
+        return RedisCache(redis, retry_after_seconds=settings.redis_retry_after_seconds)
+
+    @staticmethod
+    def _build_rate_limiter(redis: Redis | None) -> RateLimiter:
+        if redis is None:
+            return InMemoryRateLimiter()
+        return FallbackRateLimiter(RedisRateLimiter(redis), InMemoryRateLimiter())
 
     @staticmethod
     def _build_storage(settings: Settings) -> AttachmentStorage:
