@@ -99,3 +99,26 @@ security-related operation (CLI command or own review). Format as defined in the
 - Changes: none for the finding; feature commit 68b6877
 - Notes: none
 
+### T-008 | 2026-10-18T07:28:02Z | phase 5
+- Source: Self
+- Why: security review of the UI server written in phase 5 (cookies, CSRF, XSS, uploads/downloads, redirects, headers, logging)
+- Input: `ui/src/**`, `ui/views/**`, `ui/test/**`
+- Output: own review notes:
+  1. Session cookie `tb_session`: HttpOnly, SameSite=Lax, Secure unless COOKIE_SECURE=false (local HTTP only), lifetime capped at the API session expiry. Cleared when the API answers 401. Tested.
+  2. CSRF: HMAC-bound double-submit token on every non-GET request including login/register/reset (login CSRF) and logout; Origin must equal PUBLIC_URL when present; bodies that are not urlencoded or the multipart upload carry no `_csrf` and are rejected. Nonce rotated at login and logout. Tested with no token, forged token, foreign Origin, missing cookie and JSON body.
+  3. Multipart is parsed only on `POST /tasks/:id/attachments` (before CSRF verification, so uploads are CSRF-checked too) and refused with 415 elsewhere; multer limits: 1 file, 10 MB, 5 fields, 1 KB per field.
+  4. XSS: EJS `<%= %>` everywhere except includes and the two sanitised Markdown outputs; Markdown via marked then sanitize-html allow-list (no script/style/img/iframe/event handlers, href schemes http/https/mailto, no protocol-relative). Tests cover script, javascript:, data:, onerror, iframe, style and protocol-relative payloads in descriptions and comments.
+  5. CSP `script-src 'none'`, `default-src 'self'`, `frame-ancestors 'none'`, `form-action 'self'`, `base-uri 'none'`; HSTS when HTTPS; Referrer-Policy no-referrer (keeps the reset token in /reset-password?token= from leaking via Referer); Cache-Control no-store on all dynamic pages; X-Powered-By removed.
+  6. No open redirects: every redirect target is a constant or built from a UUID-validated id. Route ids are checked against a UUID pattern before any API call and the API client percent-encodes path segments, so `../` can not reach other API paths. The API client sets `redirect: "error"` and uses a fixed base URL.
+  7. Downloads always `application/octet-stream` (CSV: text/csv) with `Content-Disposition: attachment` (validated to contain no CR/LF) and nosniff.
+  8. Errors: 5xx and network errors show a generic page; API 4xx messages (generic by design) are shown escaped.
+  9. Logs: fresh request id per request (client-supplied ids ignored), access log has path only, pino redacts password/token/cookie keys. Verified in a local end-to-end run that neither service logged a password or the session cookie.
+  10. Client IP for API rate limits comes from Express `req.ip` with `trust proxy` = TRUST_PROXY hops (0 locally, 1 behind the ALB), so X-Forwarded-For can not be spoofed beyond the trusted hop.
+  11. FOUND by a unit test: the Markdown renderer's `rel="noopener noreferrer nofollow"` on links was being removed because `rel` was not in sanitize-html's allowed attributes. Recorded as F-025; fixed before commit.
+  12. Accepted: uploads are buffered in memory (multer memoryStorage, at most 10 MB each) before being forwarded; many concurrent uploads could pressure memory. Recorded as F-026.
+- Interpretation: own analysis plus the test results named above.
+- Findings: F-025, F-026; dispositions of F-002, F-003, F-009, F-011, F-014, F-018 updated
+- Action: applied (F-025 fixed), F-026 accepted risk
+- Changes: ui/src/views/MarkdownRenderer.ts (commit d43ecc2)
+- Notes: a local end-to-end run (API and UI as real processes on native PostgreSQL/Redis, driven by scripts/smoke.sh through the UI only) passed. The first UI start failed config validation because the shell already exported `API_TIMEOUT_MS` (set by another tool); the variable was renamed to `API_REQUEST_TIMEOUT_MS`. Not security relevant, so no finding.
+
