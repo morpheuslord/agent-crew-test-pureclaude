@@ -211,7 +211,13 @@ describe("composition root", () => {
   it("wires the real API client into the app", async () => {
     const { composeApp } = await import("../src/composition.js");
     const { default: supertest } = await import("supertest");
-    const app = composeApp(loadConfig(env), createLogger("silent"));
+    // A closed loopback port fails fast, so readiness reports the API as unavailable.
+    const config = loadConfig({
+      ...env,
+      API_BASE_URL: "http://127.0.0.1:9",
+      API_REQUEST_TIMEOUT_MS: "500",
+    });
+    const app = composeApp(config, createLogger("silent"));
     expect((await supertest(app).get("/healthz")).body).toEqual({ status: "ok" });
     const ready = await supertest(app).get("/readyz");
     expect(ready.status).toBe(503);

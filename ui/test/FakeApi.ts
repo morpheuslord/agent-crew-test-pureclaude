@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { ApiClient, ApiContext, ProjectChanges, UserChanges } from "../src/api/ApiClient.js";
+import type { ApiClient, ApiContext, ProjectChanges } from "../src/api/ApiClient.js";
 import { ApiError } from "../src/api/errors.js";
 import type {
   Activity,
   Attachment,
   BinaryDownload,
   Comment,
-  LoginResult,
   Member,
   Page,
   Project,
@@ -18,208 +17,12 @@ import type {
   Team,
   TeamDetail,
   UploadFile,
-  User,
 } from "../src/api/types.js";
-
-const NOW = "2026-10-18T09:00:00.000Z";
-
-function page<T>(items: T[], pageNumber = 1, size = 20): Page<T> {
-  const start = (pageNumber - 1) * size;
-  return {
-    items: items.slice(start, start + size),
-    page: pageNumber,
-    page_size: size,
-    total: items.length,
-  };
-}
-
-function stream(data: Uint8Array): ReadableStream<Uint8Array> {
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(data);
-      controller.close();
-    },
-  });
-}
+import { FakeAccountsApi } from "./FakeAccountsApi.js";
+import { NOW, page, stream } from "./FakeApiBase.js";
 
 /** A small in-memory stand-in for the API with the same error semantics. */
-export class FakeApi implements ApiClient {
-  readonly users = new Map<string, User & { password: string }>();
-  readonly sessions = new Map<string, string>();
-  readonly teams = new Map<string, TeamDetail>();
-  readonly projects = new Map<string, ProjectDetail>();
-  readonly tasks = new Map<string, Task>();
-  readonly comments = new Map<string, Comment>();
-  readonly attachments = new Map<string, Attachment & { data: Buffer }>();
-  readonly calls: { method: string; ctx: ApiContext; args: unknown[] }[] = [];
-  readonly outbox: string[] = [];
-  failWith: ApiError | null = null;
-  isReady = true;
-
-  addUser(email: string, password: string, role: "admin" | "member" = "member"): User {
-    const user = {
-      id: randomUUID(),
-      email,
-      display_name: email.split("@")[0] ?? email,
-      role,
-      is_active: true,
-      created_at: NOW,
-      password,
-    };
-    this.users.set(user.id, user);
-    return this.publicUser(user);
-  }
-
-  private record(method: string, ctx: ApiContext, ...args: unknown[]): void {
-    this.calls.push({ method, ctx, args });
-    if (this.failWith) {
-      const error = this.failWith;
-      this.failWith = null;
-      throw error;
-    }
-  }
-
-  private static publicAttachment(a: Attachment & { data: Buffer }): Attachment {
-    return {
-      id: a.id,
-      task_id: a.task_id,
-      uploader_id: a.uploader_id,
-      uploader_name: a.uploader_name,
-      filename: a.filename,
-      content_type: a.content_type,
-      size_bytes: a.size_bytes,
-      created_at: a.created_at,
-    };
-  }
-
-  private publicUser(user: User & { password?: string }): User {
-    return {
-      id: user.id,
-      email: user.email,
-      display_name: user.display_name,
-      role: user.role,
-      is_active: user.is_active,
-      created_at: user.created_at,
-    };
-  }
-
-  private caller(ctx: ApiContext): User & { password: string } {
-    const userId = ctx.token ? this.sessions.get(ctx.token) : undefined;
-    const user = userId ? this.users.get(userId) : undefined;
-    if (!user?.is_active) {
-      throw new ApiError(401, "unauthenticated", "session is invalid or has expired");
-    }
-    return user;
-  }
-
-  private team(ctx: ApiContext, teamId: string): TeamDetail {
-    const user = this.caller(ctx);
-    const team = this.teams.get(teamId);
-    if (!team || (!team.members.some((m) => m.user_id === user.id) && user.role !== "admin")) {
-      throw new ApiError(404, "not_found", "team not found");
-    }
-    return { ...team, can_manage: team.owner_id === user.id || user.role === "admin" };
-  }
-
-  private project(ctx: ApiContext, projectId: string): ProjectDetail {
-    const project = this.projects.get(projectId);
-    if (!project) {
-      throw new ApiError(404, "not_found", "project not found");
-    }
-    const team = this.team(ctx, project.team_id);
-    return {
-      ...project,
-      can_manage: team.can_manage,
-      members: team.members,
-      webhook_secret: team.can_manage ? project.webhook_secret : null,
-    };
-  }
-
-  private task(ctx: ApiContext, taskId: string): Task {
-    const task = this.tasks.get(taskId);
-    if (!task) {
-      throw new ApiError(404, "not_found", "task not found");
-    }
-    this.project(ctx, task.project_id);
-    return task;
-  }
-
-  register(ctx: ApiContext, body: { email: string; display_name: string; password: string }) {
-    this.record("register", ctx, body);
-    if ([...this.users.values()].some((u) => u.email === body.email)) {
-      return Promise.reject(
-        new ApiError(409, "conflict", "an account with this email already exists", {
-          email: "already registered",
-        }),
-      );
-    }
-    const user = this.addUser(body.email, body.password);
-    const stored = this.users.get(user.id);
-    if (stored) {
-      stored.display_name = body.display_name;
-    }
-    return Promise.resolve({ ...user, display_name: body.display_name });
-  }
-
-  login(ctx: ApiContext, body: { email: string; password: string }): Promise<LoginResult> {
-    this.record("login", ctx, body);
-    const user = [...this.users.values()].find((u) => u.email === body.email);
-    if (user?.password !== body.password || !user.is_active) {
-      return Promise.reject(new ApiError(401, "unauthenticated", "invalid email or password"));
-    }
-    const token = randomUUID();
-    this.sessions.set(token, user.id);
-    return Promise.resolve({
-      token,
-      expires_at: new Date(Date.now() + 3_600_000).toISOString(),
-      user: this.publicUser(user),
-    });
-  }
-
-  logout(ctx: ApiContext) {
-    this.record("logout", ctx);
-    this.caller(ctx);
-    if (ctx.token) {
-      this.sessions.delete(ctx.token);
-    }
-    return Promise.resolve();
-  }
-
-  me(ctx: ApiContext) {
-    this.record("me", ctx);
-    return Promise.resolve(this.publicUser(this.caller(ctx)));
-  }
-
-  changePassword(ctx: ApiContext, body: { current_password: string; new_password: string }) {
-    this.record("changePassword", ctx, body);
-    const user = this.caller(ctx);
-    if (user.password !== body.current_password) {
-      return Promise.reject(
-        new ApiError(422, "validation_failed", "current password is incorrect", {
-          current_password: "incorrect",
-        }),
-      );
-    }
-    user.password = body.new_password;
-    return Promise.resolve();
-  }
-
-  forgotPassword(ctx: ApiContext, email: string) {
-    this.record("forgotPassword", ctx, email);
-    this.outbox.push(email);
-    return Promise.resolve();
-  }
-
-  resetPassword(ctx: ApiContext, body: { token: string; new_password: string }) {
-    this.record("resetPassword", ctx, body);
-    if (body.token !== "valid-reset-token-0123456789") {
-      return Promise.reject(
-        new ApiError(422, "validation_failed", "the reset link is invalid or has expired"),
-      );
-    }
-    return Promise.resolve();
-  }
-
+export class FakeApi extends FakeAccountsApi implements ApiClient {
   listTeams(ctx: ApiContext): Promise<Team[]> {
     this.record("listTeams", ctx);
     const user = this.caller(ctx);
@@ -539,39 +342,5 @@ export class FakeApi implements ApiClient {
       )
       .map((t) => ({ ...t, project_name: this.projects.get(t.project_id)?.name ?? "" }));
     return Promise.resolve(page(items, query.page ?? 1, query.page_size ?? 20));
-  }
-
-  listUsers(ctx: ApiContext, query: { q?: string | undefined; page: number }): Promise<Page<User>> {
-    this.record("listUsers", ctx, query);
-    if (this.caller(ctx).role !== "admin") {
-      return Promise.reject(new ApiError(403, "forbidden", "admin role required"));
-    }
-    return Promise.resolve(
-      page(
-        [...this.users.values()].map((u) => this.publicUser(u)),
-        query.page,
-        50,
-      ),
-    );
-  }
-
-  updateUser(ctx: ApiContext, userId: string, body: UserChanges) {
-    this.record("updateUser", ctx, userId, body);
-    const user = this.users.get(userId);
-    if (!user) {
-      return Promise.reject(new ApiError(404, "not_found", "user not found"));
-    }
-    Object.assign(user, body);
-    return Promise.resolve(this.publicUser(user));
-  }
-
-  globalActivity(ctx: ApiContext, pageNumber: number): Promise<Page<Activity>> {
-    this.record("globalActivity", ctx, pageNumber);
-    this.caller(ctx);
-    return Promise.resolve(page([], pageNumber, 50));
-  }
-
-  ready(): Promise<boolean> {
-    return Promise.resolve(this.isReady);
   }
 }

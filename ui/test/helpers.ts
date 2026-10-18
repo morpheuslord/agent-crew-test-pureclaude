@@ -80,3 +80,34 @@ export async function postForm(
     .type("form")
     .send({ ...fields, _csrf: token });
 }
+
+/** Log in and create a team, a project and a task with hostile Markdown. */
+export async function setupBoard(world: TestWorld) {
+  const agent = await loggedIn(world);
+  const created = await postForm(agent, "/teams", { name: "Core" });
+  const teamId = String(created.headers.location).split("/").pop() ?? "";
+  const project = await postForm(
+    agent,
+    `/teams/${teamId}/projects`,
+    { name: "Roadmap", webhook_url: "" },
+    `/teams/${teamId}`,
+  );
+  const projectId = String(project.headers.location).split("/").pop() ?? "";
+  const task = await postForm(
+    agent,
+    `/projects/${projectId}/tasks`,
+    {
+      title: "Ship it",
+      description:
+        "**bold** <script>alert(1)</script> [x](javascript:alert(1)) <img src=x onerror=alert(1)> [ok](https://example.com)",
+      status: "todo",
+      priority: "high",
+      assignee_id: "",
+      due_date: "2026-12-01",
+      labels: "release, ui",
+    },
+    `/projects/${projectId}`,
+  );
+  const taskId = String(task.headers.location).split("/").pop() ?? "";
+  return { agent, teamId, projectId, taskId };
+}
