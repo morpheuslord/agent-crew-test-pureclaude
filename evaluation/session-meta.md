@@ -172,3 +172,12 @@ Call `general_verify_code_security` with the same `components`. Do not paste cod
   code written in GitHub Actions and JavaScript/TypeScript, but not any written in Python"). Cause: the
   bootstrap commit had `api/pyproject.toml` but no `.py` files. Response: the phase 2 commit adds the
   first API Python modules. `codeql.yml` was not modified, and no scanner results were fetched or read.
+- 2026-10-18T06:28:39Z (phase 3): the user asked for Semgrep and Trivy workflows scanning all code, Terraform in
+  particular, with results in GitHub's security findings. Added as new files (T-004); the three
+  section 10 files were not touched. This is a user-directed deviation from the shared brief.
+- 2026-10-18T06:28:39Z (phase 3): the user pasted the log of the Codacy workflow's `upload-sarif` step. It ends with
+  `Error: Code Scanning could not process the submitted SARIF file: rejecting SARIF, as there are more
+  runs than allowed (31 > 20)` after many "inconsistent fingerprint" warnings. Cause: the jq step in
+  `codacy.yml` keeps each of Codacy's 31 tool runs as a separate run, and code scanning accepts at most
+  20 runs per upload. `codacy.yml` is frozen by section 10, so I asked the user before changing it. The
+  file/line references in the warnings were not treated as findings or acted on.

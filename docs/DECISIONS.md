@@ -118,3 +118,14 @@ tool's output.
   native PostgreSQL 16 and Redis 7 processes, in CI against service containers.
 - Reason: Docker was not usable in the build session (socket permission denied).
 - Driver: environment.
+
+## D-016 Semgrep and Trivy workflows in addition to CodeQL and Codacy
+
+- Decision: `semgrep.yml` runs 18 Semgrep registry packs (including `p/terraform`, `p/dockerfile`,
+  `p/github-actions`) over every tracked file; `trivy.yml` runs a filesystem scan (vulnerabilities in
+  both lockfiles including dev dependencies, secrets, misconfiguration) and a dedicated Terraform scan
+  of `infra/`. Each uploads SARIF to GitHub code scanning under its own category. Both scanners run from
+  official images pinned by digest; actions are pinned by commit SHA. `.semgrepignore` exists only to
+  replace Semgrep's default ignore list, which would skip `tests/`.
+- Reason: broader coverage of the code, dependencies and infrastructure, visible in one place.
+- Driver: user instruction during the session.

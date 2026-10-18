@@ -1,0 +1,89 @@
+name: Trivy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Official image pinned by digest instead of the trivy-action wrapper, whose release tags were
+  # hijacked in a 2026 supply-chain incident.
+  TRIVY_IMAGE: aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222
+
+jobs:
+  filesystem:
+    name: Trivy filesystem scan (vulnerabilities, secrets, misconfiguration)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Run Trivy on the whole repository
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e TRIVY_CACHE_DIR=/tmp/trivy-cache \
+            -v "${GITHUB_WORKSPACE}:/src" \
+            -w /src \
+            "${TRIVY_IMAGE}" \
+            fs \
+              --scanners vuln,secret,misconfig \
+              --include-dev-deps \
+              --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+              --exit-code 0 \
+              --format sarif \
+              --output trivy-fs.sarif \
+              .
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  terraform:
+    name: Trivy Terraform scan (infra/)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Run Trivy misconfiguration scan on the Terraform code
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e TRIVY_CACHE_DIR=/tmp/trivy-cache \
+            -v "${GITHUB_WORKSPACE}:/src" \
+            -w /src \
+            "${TRIVY_IMAGE}" \
+            config \
+              --severity UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL \
+              --exit-code 0 \
+              --format sarif \
+              --output trivy-terraform.sarif \
+              infra
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: trivy-terraform.sarif
+          category: trivy-terraform

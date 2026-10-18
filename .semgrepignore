@@ -1,0 +1,6 @@
+# Intentionally empty of patterns.
+#
+# Without this file Semgrep applies a built-in ignore list that skips test/ and tests/ directories.
+# This repository's scanners are meant to see all committed code, so this file replaces that default
+# and ignores nothing. Uncommitted paths (node_modules, .venv, ...) are not scanned anyway because
+# Semgrep only scans files tracked by git.
