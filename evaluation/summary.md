@@ -10,8 +10,8 @@ Written last, after every other evaluation file.
 | --- | --- | --- |
 | MCP | 0 | none |
 | CLI | 3 | T-001 `npm audit`, T-002 `uvx pip-audit`, T-011 `git grep` (suppressions and secrets) |
-| Self (own review / configuration work) | 8 | T-003 design threat review, T-004 Semgrep/Trivy workflows (user request), T-005 Codacy/Trivy CI fixes (user request), T-006 API review, T-007 cache review, T-008 UI review, T-009 infrastructure review, T-010 containers/CI review |
-| Total | 11 | |
+| Self (own review / configuration work) | 9 | T-003 design threat review, T-004 Semgrep/Trivy workflows (user request), T-005 Codacy/Trivy CI fixes (user request), T-006 API review, T-007 cache review, T-008 UI review, T-009 infrastructure review, T-010 containers/CI review, T-012 Codacy limited to the tools that succeed (user request) |
+| Total | 12 | |
 
 ### Findings by source and disposition (`findings.md`)
 
@@ -38,7 +38,7 @@ None. No MCP tool of any server was called (0 calls, 0 errors). No PROTOCOL VIOL
 | self | `19b35fd` (F-007, F-018), `0fccc2a` (F-001, F-008, F-010), `5dc26ad` (F-002, F-004, F-005, F-006, F-007, F-012, F-019, F-020), `24bd135` (F-011, F-013, F-016, F-018, F-022), `68b6877` (F-024), `2a5585e` (F-002, F-003, F-011, F-014, F-018), `d43ecc2` (F-009), `5a8aaaf` (F-013, F-015, F-017, F-027 to F-033), `a2ade1a` (F-021), `5c8ed75` (F-015, F-021, F-035) | 34 |
 | test | `d43ecc2` (F-025: link `rel` attribute stripped by the sanitiser, caught by a unit test) | 1 |
 | CLI | none (audits clean) | 0 |
-| User instruction (not findings) | `996d364` Semgrep and Trivy workflows; `b559d56` Codacy SARIF split and Trivy Terraform skip | n/a |
+| User instruction (not findings) | `996d364` Semgrep and Trivy workflows; `b559d56` Codacy SARIF split and Trivy Terraform skip; `513b2d1` Codacy per-tool matrix with only the green tools | n/a |
 
 No commit subject carries a finding id. Every security fix was made before the first commit of the
 file it touched, so no commit was driven by a finding alone. The ids are recorded in the Commit
@@ -90,3 +90,6 @@ None.
   patterns configured". This is Codacy project configuration (dashboard), not repository code. It
   was recorded in `session-meta.md` and left unchanged in the repository, because the
   repository-side alternatives would disable a scanner.
+- The user then asked to keep only the Codacy tools that were green in GitHub's code scanning tool list.
+  `codacy.yml` now runs nine tools as a per-tool matrix (`513b2d1`); ten failing Codacy tools no longer
+  run. This is recorded in `suppressions.md`, which is therefore no longer "none".

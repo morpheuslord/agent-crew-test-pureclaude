@@ -228,3 +228,15 @@ tool's output.
 - Reason: `API_TIMEOUT_MS` was already exported in the build environment by another tool with a value
   the validation rejects; a more specific name avoids such collisions.
 - Driver: tool output (the UI's startup validation error during the local end-to-end run).
+
+## D-029 Codacy runs only the tools that analyse this repository successfully
+
+- Decision: `codacy.yml` runs the Codacy Analysis CLI once per tool in a matrix (Bandit, Checkov,
+  Lizard, Opengrep, Prospector, Pylint, Pylint (Python 3), Ruff, Spectral), each uploading SARIF under
+  `codacy-<tool>`. Agentlinter, Biome, ESLint 9, Jacksonlinter, JSHint, Markdownlint, Oxlint, PMD,
+  PMD 7 and remark-lint are not run.
+- Reason: those ten tools failed in every Codacy run; one upload per tool also isolates failures and
+  stays under the 20-runs-per-upload limit without splitting. JavaScript/TypeScript coverage remains
+  through CodeQL, Semgrep, ESLint (typescript-eslint, in CI) and Trivy.
+- Driver: explicit user instruction (screenshot of the code scanning tool list); records the reduced
+  Codacy coverage in `evaluation/suppressions.md`.

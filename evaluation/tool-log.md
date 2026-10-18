@@ -177,3 +177,14 @@ security-related operation (CLI command or own review). Format as defined in the
 - Changes: none
 - Notes: none
 
+### T-012 | 2026-10-18T08:29:53Z | phase 8 (after wrap-up)
+- Source: Self
+- Why: user instruction with a screenshot of GitHub's code scanning tool list: "add all the tools that are in the green for the scanner"; after a clarifying question the user chose "Run only the green tools"
+- Input: screenshot (green: Bandit, Checkov, CodeQL, Lizard, Opengrep, Prospector, Pylint, Pylintpython3, Ruff, Semgrep OSS, Spectral, Trivy; red: Agentlinter, Biome, Eslint-9, Jacksonlinter, Jshint, Markdownlint, Oxlint, Pmd, Pmd-7, Remark-lint); `codacy/codacy-analysis-cli-action` action.yml (the `tool` input runs one tool); Codacy docs tool-name list (bandit, checkov, lizard, opengrep, prospector, pylintpython3, ruff, spectral; `pylint` deprecated but accepted)
+- Output: `.github/workflows/codacy.yml` rewritten as a matrix with one Codacy CLI run per green Codacy tool (bandit, checkov, lizard, opengrep, prospector, pylint, pylintpython3, ruff, spectral), each uploaded under category `codacy-<tool>`; the SARIF split step is no longer needed and was removed. CodeQL, Semgrep OSS and Trivy already run in their own workflows and are unchanged.
+- Interpretation: the screenshot shows tool status only; no alerts or results were opened or read.
+- Findings: none
+- Action: applied on the user's instruction; recorded in suppressions.md because it stops ten Codacy tools from running
+- Changes: .github/workflows/codacy.yml (commit 513b2d1)
+- Notes: `pylint` is the deprecated Codacy name; if the CLI rejects it only that matrix entry fails (fail-fast is off). Analyses previously uploaded under the categories `codacy-1` and `codacy-2` stay in code scanning until those configurations are deleted in GitHub.
+

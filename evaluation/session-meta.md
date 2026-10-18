@@ -193,6 +193,10 @@ Call `general_verify_code_security` with the same `components`. Do not paste cod
   dashboard, not in the repository. The only repository-side changes (disabling the tool in
   `.codacy.yml` or restricting the action's tools) would silence a scanner, which section 10 forbids,
   so no change was made. Scanner results were not read.
+- 2026-10-18T08:29:53Z (after wrap-up): the user sent a screenshot of GitHub's code scanning tool list and asked to
+  "add all the tools that are in the green for the scanner". Asked to clarify, the user chose "Run only
+  the green tools". \`codacy.yml\` now runs one Codacy CLI job per green tool; the ten red tools no
+  longer run (T-012, suppressions.md, DECISIONS D-029). Second user-authorised change to this frozen file.
 
 ## Checks run and skipped (definition of done, section 14)
 
