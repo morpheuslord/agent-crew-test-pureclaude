@@ -181,3 +181,7 @@ Call `general_verify_code_security` with the same `components`. Do not paste cod
   `codacy.yml` keeps each of Codacy's 31 tool runs as a separate run, and code scanning accepts at most
   20 runs per upload. `codacy.yml` is frozen by section 10, so I asked the user before changing it. The
   file/line references in the warnings were not treated as findings or acted on.
+- 2026-10-18T06:31:21Z (phase 3): asked whether to change the frozen `codacy.yml`; the user answered "fit it and fix
+  this also" and pasted the Trivy Terraform job failure (`lstat infra: no such file or directory`).
+  `codacy.yml` was modified on that explicit instruction (T-005, DECISIONS D-017). This arm's
+  `codacy.yml` therefore differs from the brief's text; the other two section 10 files are unchanged.

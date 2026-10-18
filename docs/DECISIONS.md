@@ -129,3 +129,14 @@ tool's output.
   replace Semgrep's default ignore list, which would skip `tests/`.
 - Reason: broader coverage of the code, dependencies and infrastructure, visible in one place.
 - Driver: user instruction during the session.
+
+## D-017 Codacy SARIF split into uploads of at most 20 runs
+
+- Decision: after the brief's jq step, `codacy.yml` splits `results.sarif` into files of at most 20
+  runs and uploads each under its own category (`codacy-1`, `codacy-2`, `codacy-3`). The Trivy Terraform
+  job skips with a notice when `infra/` has no Terraform files, and every SARIF upload runs only when
+  its file exists.
+- Reason: GitHub code scanning rejected the single upload (`31 > 20` runs), so no Codacy result reached
+  the Security tab.
+- Driver: tool output (CI logs pasted by the user) and an explicit user instruction to change the
+  otherwise frozen file.

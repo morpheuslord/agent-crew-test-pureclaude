@@ -47,3 +47,14 @@ security-related operation (CLI command or own review). Format as defined in the
 - Changes: .github/workflows/semgrep.yml, .github/workflows/trivy.yml, .semgrepignore, docs/DECISIONS.md D-016 (commit filled in below)
 - Notes: Trivy reports Terraform misconfigurations in both categories (the filesystem job includes misconfig); the dedicated category is what the user asked for.
 
+### T-005 | 2026-10-18T06:31:21Z | phase 3
+- Source: Self
+- Why: the user pasted two CI failures and explicitly authorised fixing them, including the frozen `codacy.yml` ("fix it and fix this also"): (1) Codacy upload rejected with `more runs than allowed (31 > 20)`; (2) the Trivy Terraform job failed with `lstat infra: no such file or directory` because `infra/` has no files until phase 6
+- Input: the two pasted logs; local test of the new split step with jq 1.8.2 on a synthetic 31-run SARIF file
+- Output: local test printed `SARIF has 31 runs, writing 2 file(s)`, `codacy-1.sarif runs=20 first=codacy/tool0/0 last=codacy/tool5/19`, `codacy-2.sarif runs=11 first=codacy/tool6/20 last=codacy/tool2/30`
+- Interpretation: splitting keeps every run and its per-run automation id, with each upload under the 20-run limit.
+- Findings: none
+- Action: applied. `codacy.yml`: the original upload step is replaced by a split step plus three upload steps (`codacy-1` to `codacy-3`, each only if its file exists); checkout, the Codacy CLI step and the jq category step are unchanged. `trivy.yml`: the Terraform job exits 0 with a notice when `infra/` has no `.tf` files; both Trivy uploads and the Semgrep upload run only when their SARIF file exists.
+- Changes: .github/workflows/codacy.yml, .github/workflows/trivy.yml, .github/workflows/semgrep.yml (commit filled in below)
+- Notes: modifying `codacy.yml` deviates from section 10; done only on the user's explicit instruction, recorded in session-meta.md and DECISIONS D-017. Scanner findings in the pasted logs were not read or acted on.
+

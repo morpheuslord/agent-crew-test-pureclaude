@@ -37,8 +37,39 @@ jobs:
           jq '.runs |= (to_entries | map(.value + {automationDetails: {id: ("codacy/" + (.value.tool.driver.name // "codacy") + "/" + (.key | tostring))}}))' results.sarif > results.fixed.sarif
           mv results.fixed.sarif results.sarif
 
-      - name: Upload SARIF to code scanning
+      # Code scanning accepts at most 20 runs per SARIF file, and Codacy emits one run per tool
+      # invocation (31 at the time of writing), so split the runs into files of 20 and upload each.
+      - name: Split SARIF into files of at most 20 runs
+        run: |
+          total=$(jq '.runs | length' results.sarif)
+          parts=$(( (total + 19) / 20 ))
+          echo "SARIF has ${total} runs, writing ${parts} file(s)"
+          if [ "${parts}" -gt 3 ]; then
+            echo "::error::${total} runs need ${parts} uploads; add more upload steps below"
+            exit 1
+          fi
+          for part in $(seq 1 "${parts}"); do
+            start=$(( (part - 1) * 20 ))
+            jq --argjson s "${start}" '.runs |= .[$s:$s + 20]' results.sarif > "codacy-${part}.sarif"
+          done
+
+      - name: Upload SARIF to code scanning (runs 1-20)
+        if: hashFiles('codacy-1.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: results.sarif
-          category: codacy
+          sarif_file: codacy-1.sarif
+          category: codacy-1
+
+      - name: Upload SARIF to code scanning (runs 21-40)
+        if: hashFiles('codacy-2.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: codacy-2.sarif
+          category: codacy-2
+
+      - name: Upload SARIF to code scanning (runs 41-60)
+        if: hashFiles('codacy-3.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: codacy-3.sarif
+          category: codacy-3

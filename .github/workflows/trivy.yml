@@ -46,7 +46,7 @@ jobs:
               .
 
       - name: Upload SARIF to code scanning
-        if: always()
+        if: always() && hashFiles('trivy-fs.sarif') != ''
         uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: trivy-fs.sarif
@@ -67,6 +67,10 @@ jobs:
 
       - name: Run Trivy misconfiguration scan on the Terraform code
         run: |
+          if ! find infra -name '*.tf' -print -quit 2>/dev/null | grep -q .; then
+            echo "::notice::No Terraform files under infra/ yet; skipping the Terraform scan"
+            exit 0
+          fi
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             -e HOME=/tmp \
@@ -82,7 +86,7 @@ jobs:
               infra
 
       - name: Upload SARIF to code scanning
-        if: always()
+        if: always() && hashFiles('trivy-terraform.sarif') != ''
         uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           sarif_file: trivy-terraform.sarif
